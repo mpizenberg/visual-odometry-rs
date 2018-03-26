@@ -4,9 +4,9 @@ use std::fs::File;
 use std::path::Path;
 
 pub fn main() {
-    let img_path = Path::new("images/0001.png");
+    let img_path = Path::new("data/images/0001.png");
     let img = image::open(&img_path).expect("Cannot open image");
-    let out_path = Path::new("out.png");
+    let out_path = Path::new("out/resize_gray.png");
     let mut out_file = File::create(&out_path).expect("Cannot create file");
 
     // flip image along horizontal axis
