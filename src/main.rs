@@ -1,3 +1,3 @@
 fn main() {
-    println!("Examples in examples/ directory");
+    println!("Use: cargo run --example read_image");
 }
