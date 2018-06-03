@@ -17,5 +17,11 @@ serde_derive = "1.0"
 # Each data format lives in its own crate;
 serde_json = "1.0"
 
+# Easily look for folders
+find_folder = "0.3"
+
+# Generate random numbers
+rand= "0.5"
+
 # GUI
 conrod = { version = "0.60", features = ["winit", "glium"] }
