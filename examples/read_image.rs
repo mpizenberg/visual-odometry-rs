@@ -3,8 +3,8 @@ extern crate image;
 use std::fs::File;
 use std::path::Path;
 
-#[allow(dead_code)]
-pub fn main() {
+// #[allow(dead_code)]
+fn main() {
     let img_path = Path::new("data/images/0001.png");
     let img = image::open(&img_path).expect("Cannot open image");
     let out_path = Path::new("out/resize_gray.png");
