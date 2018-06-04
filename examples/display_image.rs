@@ -32,15 +32,16 @@ fn main() {
     let mut renderer = conrod::backend::glium::Renderer::new(&display).unwrap();
 
     // The `WidgetId` for our background and `Image` widgets.
-    widget_ids!(struct Ids { background, rust_logo });
+    widget_ids!(struct Ids { background, texture });
     let ids = Ids::new(ui.widget_id_generator());
 
     // Create our `conrod::image::Map` which describes each of our widget->image mappings.
     // In our case we only have one image, however the macro may be used to list multiple.
-    let rust_logo = load_rust_logo(&display);
-    let (w, h) = (rust_logo.get_width(), rust_logo.get_height().unwrap());
+    let raw_image = load_raw_image("data/images/0001.png");
+    let texture = glium::texture::Texture2d::new(&display, raw_image).unwrap();
+    let (w, h) = (texture.get_width(), texture.get_height().unwrap());
     let mut image_map = conrod::image::Map::new();
-    let rust_logo = image_map.insert(rust_logo);
+    let texture = image_map.insert(texture);
 
     // Poll events from the window.
     let mut event_loop = support::EventLoop::new();
@@ -54,7 +55,6 @@ fn main() {
 
             match event {
                 glium::glutin::Event::WindowEvent { event, .. } => match event {
-                    // Break from the loop upon `Escape`.
                     glium::glutin::WindowEvent::Closed => break 'main,
                     _ => (),
                 },
@@ -70,10 +70,10 @@ fn main() {
                 .color(color::LIGHT_BLUE)
                 .set(ids.background, ui);
             // Instantiate the `Image` at its full size in the middle of the window.
-            widget::Image::new(rust_logo)
+            widget::Image::new(texture)
                 .w_h(w as f64, h as f64)
                 .middle()
-                .set(ids.rust_logo, ui);
+                .set(ids.texture, ui);
         }
 
         // Render the `Ui` and then display it on the screen.
@@ -87,15 +87,10 @@ fn main() {
     }
 }
 
-// Load the Rust logo from our assets folder to use as an example image.
-fn load_rust_logo(display: &glium::Display) -> glium::texture::Texture2d {
-    let path = "data/images/0001.png";
-    let rgba_image = image::open(&std::path::Path::new(&path)).unwrap().to_rgba();
-    let image_dimensions = rgba_image.dimensions();
-    let raw_image = glium::texture::RawImage2d::from_raw_rgba_reversed(
-        &rgba_image.into_raw(),
-        image_dimensions,
-    );
-    let texture = glium::texture::Texture2d::new(display, raw_image).unwrap();
-    texture
+// Function loading an image from a path
+fn load_raw_image(path: &str) -> glium::texture::RawImage2d<u8> {
+    let img_path = std::path::Path::new(path);
+    let img_rgba = image::open(&img_path).expect("Cannot open image").to_rgba();
+    let img_size = img_rgba.dimensions();
+    glium::texture::RawImage2d::from_raw_rgba_reversed(&img_rgba.into_raw(), img_size)
 }
