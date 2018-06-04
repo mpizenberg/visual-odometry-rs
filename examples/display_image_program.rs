@@ -4,7 +4,7 @@
 extern crate conrod;
 extern crate image;
 
-mod support;
+mod program;
 
 use conrod::backend::glium::glium;
 use conrod::backend::glium::glium::Surface; // trait
@@ -14,43 +14,29 @@ const WIDTH: u32 = 620;
 const HEIGHT: u32 = 480;
 
 fn main() {
-    // Build the window.
-    let mut events_loop = glium::glutin::EventsLoop::new();
-    let window = glium::glutin::WindowBuilder::new()
-        .with_title("Image Widget Demonstration")
-        .with_dimensions(WIDTH, HEIGHT);
-    let context = glium::glutin::ContextBuilder::new()
-        .with_vsync(true)
-        .with_multisampling(4);
-    let display = glium::Display::new(window, context, &events_loop).unwrap();
-
-    // construct our `Ui`.
-    let mut ui = conrod::UiBuilder::new([WIDTH as f64, HEIGHT as f64]).build();
-
-    // A type used for converting `conrod::render::Primitives` into `Command`s that can be used
-    // for drawing to the glium `Surface`.
-    let mut renderer = conrod::backend::glium::Renderer::new(&display).unwrap();
+    // Init the program
+    let mut prog = program::Program::new(WIDTH, HEIGHT, "Conrod image example");
 
     // The `WidgetId` for our background and `Image` widgets.
     widget_ids!(struct Ids { background, texture });
-    let ids = Ids::new(ui.widget_id_generator());
+    let ids = Ids::new(prog.ui.widget_id_generator());
 
     // Create our `conrod::image::Map` which describes each of our widget->image mappings.
     // In our case we only have one image, however the macro may be used to list multiple.
     let raw_image = load_raw_image("data/images/0001.png");
-    let texture = glium::texture::Texture2d::new(&display, raw_image).unwrap();
+    let texture = glium::texture::Texture2d::new(&prog.display, raw_image).unwrap();
     let (w, h) = (texture.width(), texture.height());
     let mut image_map = conrod::image::Map::new();
     let texture = image_map.insert(texture);
 
     // Poll events from the window.
-    let mut event_loop = support::EventLoop::new(std::time::Duration::from_millis(16));
+    let mut event_loop = program::EventLoop::new(std::time::Duration::from_millis(16));
     'main: loop {
         // Handle all events.
-        for event in event_loop.next(&mut events_loop) {
+        for event in event_loop.next(&mut prog.glium_events_loop) {
             // Use the `winit` backend to convert the winit event to a conrod one.
-            if let Some(ev) = conrod::backend::winit::convert_event(event.clone(), &display) {
-                ui.handle_event(ev);
+            if let Some(ev) = conrod::backend::winit::convert_event(event.clone(), &prog.display) {
+                prog.ui.handle_event(ev);
             }
 
             match event {
@@ -63,9 +49,7 @@ fn main() {
         }
 
         // Instantiate the widgets.
-        {
-            // Process higher level events (DoubleClick ...) created by Ui::handle_event.
-            let ui = &mut ui.set_widgets();
+        prog.draw(&mut |ui| {
             // Draw a light blue background.
             widget::Canvas::new()
                 .color(color::LIGHT_BLUE)
@@ -75,14 +59,16 @@ fn main() {
                 .w_h(w as f64, h as f64)
                 .middle()
                 .set(ids.texture, ui);
-        }
+        });
 
         // Render the `Ui` and then display it on the screen.
-        if let Some(primitives) = ui.draw_if_changed() {
-            renderer.fill(&display, primitives, &image_map);
-            let mut target = display.draw();
+        if let Some(primitives) = prog.ui.draw_if_changed() {
+            prog.renderer.fill(&prog.display, primitives, &image_map);
+            let mut target = prog.display.draw();
             target.clear_color(0.0, 0.0, 0.0, 1.0);
-            renderer.draw(&display, &mut target, &image_map).unwrap();
+            prog.renderer
+                .draw(&prog.display, &mut target, &image_map)
+                .unwrap();
             target.finish().unwrap();
         }
     }
