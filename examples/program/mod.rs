@@ -67,6 +67,7 @@ impl Program {
             // Use the `winit` backend to convert the winit event to a conrod one.
             if let Some(ev) = conrod::backend::winit::convert_event(event.clone(), &self.display) {
                 self.ui.handle_event(ev);
+                self.event_loop.ui_needs_update = true;
             };
 
             match event {
@@ -110,6 +111,7 @@ impl Program {
 struct EventLoop {
     time_step: std::time::Duration,
     last_update: std::time::Instant,
+    ui_needs_update: bool,
 }
 
 impl EventLoop {
@@ -117,6 +119,7 @@ impl EventLoop {
         EventLoop {
             time_step,
             last_update: std::time::Instant::now(),
+            ui_needs_update: true,
         }
     }
 
@@ -124,8 +127,7 @@ impl EventLoop {
     fn next(&mut self, events_loop: &mut glutin::EventsLoop) -> Vec<glutin::Event> {
         // We don't want to loop any faster than 60 FPS, so wait until it has been at least 16ms
         // since the last yield.
-        let last_update = self.last_update;
-        let duration_since_last_update = std::time::Instant::now().duration_since(last_update);
+        let duration_since_last_update = std::time::Instant::now().duration_since(self.last_update);
         if duration_since_last_update < self.time_step {
             std::thread::sleep(self.time_step - duration_since_last_update);
         }
@@ -135,13 +137,14 @@ impl EventLoop {
         events_loop.poll_events(|event| events.push(event));
 
         // If there are no events and the `Ui` does not need updating, wait for the next event.
-        if events.is_empty() {
+        if events.is_empty() && !self.ui_needs_update {
             events_loop.run_forever(|event| {
                 events.push(event);
                 glutin::ControlFlow::Break
             });
         }
 
+        self.ui_needs_update = false;
         self.last_update = std::time::Instant::now();
 
         events
