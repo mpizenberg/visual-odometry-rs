@@ -1,42 +1,43 @@
 extern crate conrod;
 
-use conrod::backend::glium::glium;
+use conrod::backend::glium;
 use conrod::backend::glium::glium::Surface; // trait
+use conrod::backend::glium::glium::glutin;
 use std;
 
 pub struct Program {
     event_loop: EventLoop,
     ui: conrod::Ui,
-    glium_events_loop: glium::glutin::EventsLoop,
-    renderer: conrod::backend::glium::Renderer,
-    pub display: glium::Display,
+    glium_events_loop: glutin::EventsLoop,
+    renderer: glium::Renderer,
+    pub display: glium::glium::Display,
 }
 
-pub enum Continuation {
+enum Continuation {
     Stop,
     Continue,
 }
 
 impl Program {
     pub fn new(title: &str, width: u32, height: u32, refresh_time: std::time::Duration) -> Program {
-        let mut glium_events_loop = glium::glutin::EventsLoop::new();
-        let window = glium::glutin::WindowBuilder::new()
+        let glium_events_loop = glutin::EventsLoop::new();
+        let window = glutin::WindowBuilder::new()
             .with_title(title)
             .with_dimensions(width, height);
-        let context = glium::glutin::ContextBuilder::new()
+        let context = glutin::ContextBuilder::new()
             .with_vsync(true)
             .with_multisampling(4);
-        let display = glium::Display::new(window, context, &glium_events_loop).unwrap();
+        let display = glium::glium::Display::new(window, context, &glium_events_loop).unwrap();
         Program {
             event_loop: EventLoop::new(refresh_time),
             ui: conrod::UiBuilder::new([width as f64, height as f64]).build(),
             glium_events_loop: glium_events_loop,
-            renderer: conrod::backend::glium::Renderer::new(&display).unwrap(),
+            renderer: glium::Renderer::new(&display).unwrap(),
             display: display,
         }
     }
 
-    pub fn draw<F>(&mut self, f: &F) -> ()
+    fn draw<F>(&mut self, f: &F) -> ()
     where
         F: Fn(&mut conrod::UiCell) -> (),
     {
@@ -45,10 +46,10 @@ impl Program {
         f(ui_cell)
     }
 
-    pub fn render<Img>(&mut self, image_map: &conrod::image::Map<Img>) -> ()
+    fn render<Img>(&mut self, image_map: &conrod::image::Map<Img>) -> ()
     where
-        Img: std::ops::Deref + conrod::backend::glium::TextureDimensions,
-        for<'a> glium::uniforms::Sampler<'a, Img>: glium::uniforms::AsUniformValue,
+        Img: std::ops::Deref + glium::TextureDimensions,
+        for<'a> glium::glium::uniforms::Sampler<'a, Img>: glium::glium::uniforms::AsUniformValue,
     {
         if let Some(primitives) = self.ui.draw_if_changed() {
             self.renderer.fill(&self.display, primitives, image_map);
@@ -61,7 +62,7 @@ impl Program {
         }
     }
 
-    pub fn process_events(&mut self) -> Continuation {
+    fn process_events(&mut self) -> Continuation {
         for event in self.event_loop.next(&mut self.glium_events_loop) {
             // Use the `winit` backend to convert the winit event to a conrod one.
             if let Some(ev) = conrod::backend::winit::convert_event(event.clone(), &self.display) {
@@ -69,8 +70,8 @@ impl Program {
             };
 
             match event {
-                glium::glutin::Event::WindowEvent { event, .. } => match event {
-                    glium::glutin::WindowEvent::Closed => return Continuation::Stop,
+                glutin::Event::WindowEvent { event, .. } => match event {
+                    glutin::WindowEvent::Closed => return Continuation::Stop,
                     _ => return Continuation::Continue,
                 },
                 _ => return Continuation::Continue,
@@ -81,8 +82,8 @@ impl Program {
 
     pub fn run<Img, F>(&mut self, image_map: &conrod::image::Map<Img>, f: &F) -> ()
     where
-        Img: std::ops::Deref + conrod::backend::glium::TextureDimensions,
-        for<'a> glium::uniforms::Sampler<'a, Img>: glium::uniforms::AsUniformValue,
+        Img: std::ops::Deref + glium::TextureDimensions,
+        for<'a> glium::glium::uniforms::Sampler<'a, Img>: glium::glium::uniforms::AsUniformValue,
         F: Fn(&mut conrod::UiCell) -> (),
     {
         'main: loop {
@@ -110,13 +111,13 @@ impl Program {
 ///
 /// This `Iterator`-like type simplifies some of the boilerplate involved in setting up a
 /// glutin+glium event loop that works efficiently with conrod.
-pub struct EventLoop {
+struct EventLoop {
     time_step: std::time::Duration,
     last_update: std::time::Instant,
 }
 
 impl EventLoop {
-    pub fn new(time_step: std::time::Duration) -> Self {
+    fn new(time_step: std::time::Duration) -> Self {
         EventLoop {
             time_step,
             last_update: std::time::Instant::now(),
@@ -124,10 +125,7 @@ impl EventLoop {
     }
 
     /// Produce an iterator yielding all available events.
-    pub fn next(
-        &mut self,
-        events_loop: &mut glium::glutin::EventsLoop,
-    ) -> Vec<glium::glutin::Event> {
+    fn next(&mut self, events_loop: &mut glutin::EventsLoop) -> Vec<glutin::Event> {
         // We don't want to loop any faster than 60 FPS, so wait until it has been at least 16ms
         // since the last yield.
         let last_update = self.last_update;
@@ -144,7 +142,7 @@ impl EventLoop {
         if events.is_empty() {
             events_loop.run_forever(|event| {
                 events.push(event);
-                glium::glutin::ControlFlow::Break
+                glutin::ControlFlow::Break
             });
         }
 
