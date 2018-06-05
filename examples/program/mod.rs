@@ -7,7 +7,7 @@ use std;
 
 pub struct Program {
     event_loop: EventLoop,
-    ui: conrod::Ui,
+    pub ui: conrod::Ui,
     glium_events_loop: glutin::EventsLoop,
     renderer: glium::Renderer,
     pub display: glium::glium::Display,
@@ -98,10 +98,6 @@ impl Program {
             // Render the ui and then display it on the screen.
             self.render(image_map);
         }
-    }
-
-    pub fn widget_id_generator(&mut self) -> conrod::widget::id::Generator {
-        self.ui.widget_id_generator()
     }
 }
 

@@ -32,7 +32,7 @@ fn main() {
 
     // Create our widgets.
     widget_ids!(struct Ids { background, texture });
-    let ids = Ids::new(prog.widget_id_generator());
+    let ids = Ids::new(prog.ui.widget_id_generator());
 
     let my_widgets = |ui: &mut conrod::UiCell| {
         // Draw a light blue background.
