@@ -34,7 +34,7 @@ fn main() {
     widget_ids!(struct Ids { background, texture });
     let ids = Ids::new(prog.ui.widget_id_generator());
 
-    let my_widgets = |ui: &mut conrod::UiCell| {
+    let mut my_widgets = |ui: &mut conrod::UiCell| {
         // Draw a light blue background.
         widget::Canvas::new()
             .color(color::LIGHT_BLUE)
@@ -47,7 +47,7 @@ fn main() {
     };
 
     // Run forever our program.
-    prog.run(&image_map, &my_widgets);
+    prog.run(&image_map, &mut my_widgets);
 }
 
 // Function loading an image from a path.

@@ -37,9 +37,9 @@ impl Program {
         }
     }
 
-    fn draw<F>(&mut self, f: &F) -> ()
+    fn draw<F>(&mut self, f: &mut F) -> ()
     where
-        F: Fn(&mut conrod::UiCell) -> (),
+        F: FnMut(&mut conrod::UiCell) -> (),
     {
         // Process higher level events (DoubleClick ...) created by Ui::handle_event.
         let ui_cell = &mut self.ui.set_widgets();
@@ -80,11 +80,11 @@ impl Program {
         Continuation::Continue
     }
 
-    pub fn run<Img, F>(&mut self, image_map: &conrod::image::Map<Img>, f: &F) -> ()
+    pub fn run<Img, F>(&mut self, image_map: &conrod::image::Map<Img>, f: &mut F) -> ()
     where
         Img: std::ops::Deref + glium::TextureDimensions,
         for<'a> glium::glium::uniforms::Sampler<'a, Img>: glium::glium::uniforms::AsUniformValue,
-        F: Fn(&mut conrod::UiCell) -> (),
+        F: FnMut(&mut conrod::UiCell) -> (),
     {
         'main: loop {
             // Handle all events.
