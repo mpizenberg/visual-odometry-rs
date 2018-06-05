@@ -5,7 +5,7 @@ use conrod::backend::glium::glium::Surface; // trait
 use std;
 
 pub struct Program {
-    event_loop: EventLoop,
+    pub event_loop: EventLoop,
     pub ui: conrod::Ui,
     // stuff from glium
     pub glium_events_loop: glium::glutin::EventsLoop,
@@ -13,8 +13,31 @@ pub struct Program {
     pub renderer: conrod::backend::glium::Renderer,
 }
 
+pub enum Continuation {
+    Stop,
+    Continue,
+}
+
 impl Program {
-    pub fn new(width: u32, height: u32, title: &str) -> Program {
+    pub fn process_events(&mut self) -> Continuation {
+        for event in self.event_loop.next(&mut self.glium_events_loop) {
+            // Use the `winit` backend to convert the winit event to a conrod one.
+            if let Some(ev) = conrod::backend::winit::convert_event(event.clone(), &self.display) {
+                self.ui.handle_event(ev);
+            };
+
+            match event {
+                glium::glutin::Event::WindowEvent { event, .. } => match event {
+                    glium::glutin::WindowEvent::Closed => return Continuation::Stop,
+                    _ => return Continuation::Continue,
+                },
+                _ => return Continuation::Continue,
+            };
+        }
+        Continuation::Continue
+    }
+
+    pub fn new(title: &str, width: u32, height: u32, refresh_time: std::time::Duration) -> Program {
         let mut glium_events_loop = glium::glutin::EventsLoop::new();
         let window = glium::glutin::WindowBuilder::new()
             .with_title(title)
@@ -24,7 +47,7 @@ impl Program {
             .with_multisampling(4);
         let display = glium::Display::new(window, context, &glium_events_loop).unwrap();
         Program {
-            event_loop: EventLoop::new(std::time::Duration::from_millis(16)),
+            event_loop: EventLoop::new(refresh_time),
             ui: conrod::UiBuilder::new([width as f64, height as f64]).build(),
             glium_events_loop: glium_events_loop,
             renderer: conrod::backend::glium::Renderer::new(&display).unwrap(),

@@ -7,7 +7,6 @@ extern crate image;
 mod program;
 
 use conrod::backend::glium::glium;
-use conrod::backend::glium::glium::Surface; // trait
 use conrod::{color, widget, Colorable, Positionable, Sizeable, Widget};
 
 const WIDTH: u32 = 620;
@@ -15,7 +14,12 @@ const HEIGHT: u32 = 480;
 
 fn main() {
     // Init the program
-    let mut prog = program::Program::new(WIDTH, HEIGHT, "Conrod image example");
+    let mut prog = program::Program::new(
+        "Conrod image example",
+        WIDTH,
+        HEIGHT,
+        std::time::Duration::from_millis(16),
+    );
 
     // The `WidgetId` for our background and `Image` widgets.
     widget_ids!(struct Ids { background, texture });
@@ -30,22 +34,10 @@ fn main() {
     let texture = image_map.insert(texture);
 
     // Poll events from the window.
-    let mut event_loop = program::EventLoop::new(std::time::Duration::from_millis(16));
     'main: loop {
         // Handle all events.
-        for event in event_loop.next(&mut prog.glium_events_loop) {
-            // Use the `winit` backend to convert the winit event to a conrod one.
-            if let Some(ev) = conrod::backend::winit::convert_event(event.clone(), &prog.display) {
-                prog.ui.handle_event(ev);
-            }
-
-            match event {
-                glium::glutin::Event::WindowEvent { event, .. } => match event {
-                    glium::glutin::WindowEvent::Closed => break 'main,
-                    _ => (),
-                },
-                _ => (),
-            }
+        if let program::Continuation::Stop = prog.process_events() {
+            break 'main;
         }
 
         // Instantiate the widgets.
