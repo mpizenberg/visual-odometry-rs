@@ -21,17 +21,18 @@ fn main() {
         std::time::Duration::from_millis(16),
     );
 
-    // The `WidgetId` for our background and `Image` widgets.
-    widget_ids!(struct Ids { background, texture });
-    let ids = Ids::new(prog.ui.widget_id_generator());
-
-    // Create our `conrod::image::Map` which describes each of our widget->image mappings.
-    // In our case we only have one image, however the macro may be used to list multiple.
+    // Load our image from files, convert it into a texture for widgets.
     let raw_image = load_raw_image("data/images/0001.png");
     let texture = glium::texture::Texture2d::new(&prog.display, raw_image).unwrap();
     let (w, h) = (texture.width(), texture.height());
+
+    // Create a hashmap containing our image data for the widgets.
     let mut image_map = conrod::image::Map::new();
     let texture = image_map.insert(texture);
+
+    // Create our widgets.
+    widget_ids!(struct Ids { background, texture });
+    let ids = Ids::new(prog.ui.widget_id_generator());
 
     let my_widgets = |ui: &mut conrod::UiCell| {
         // Draw a light blue background.
