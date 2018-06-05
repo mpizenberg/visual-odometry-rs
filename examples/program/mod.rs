@@ -19,24 +19,6 @@ pub enum Continuation {
 }
 
 impl Program {
-    pub fn process_events(&mut self) -> Continuation {
-        for event in self.event_loop.next(&mut self.glium_events_loop) {
-            // Use the `winit` backend to convert the winit event to a conrod one.
-            if let Some(ev) = conrod::backend::winit::convert_event(event.clone(), &self.display) {
-                self.ui.handle_event(ev);
-            };
-
-            match event {
-                glium::glutin::Event::WindowEvent { event, .. } => match event {
-                    glium::glutin::WindowEvent::Closed => return Continuation::Stop,
-                    _ => return Continuation::Continue,
-                },
-                _ => return Continuation::Continue,
-            };
-        }
-        Continuation::Continue
-    }
-
     pub fn new(title: &str, width: u32, height: u32, refresh_time: std::time::Duration) -> Program {
         let mut glium_events_loop = glium::glutin::EventsLoop::new();
         let window = glium::glutin::WindowBuilder::new()
@@ -75,6 +57,24 @@ impl Program {
                 .unwrap();
             target.finish().unwrap();
         }
+    }
+
+    pub fn process_events(&mut self) -> Continuation {
+        for event in self.event_loop.next(&mut self.glium_events_loop) {
+            // Use the `winit` backend to convert the winit event to a conrod one.
+            if let Some(ev) = conrod::backend::winit::convert_event(event.clone(), &self.display) {
+                self.ui.handle_event(ev);
+            };
+
+            match event {
+                glium::glutin::Event::WindowEvent { event, .. } => match event {
+                    glium::glutin::WindowEvent::Closed => return Continuation::Stop,
+                    _ => return Continuation::Continue,
+                },
+                _ => return Continuation::Continue,
+            };
+        }
+        Continuation::Continue
     }
 }
 
