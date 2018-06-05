@@ -5,12 +5,11 @@ use conrod::backend::glium::glium::Surface; // trait
 use std;
 
 pub struct Program {
-    pub event_loop: EventLoop,
-    pub ui: conrod::Ui,
-    // stuff from glium
-    pub glium_events_loop: glium::glutin::EventsLoop,
+    event_loop: EventLoop,
+    ui: conrod::Ui,
+    glium_events_loop: glium::glutin::EventsLoop,
+    renderer: conrod::backend::glium::Renderer,
     pub display: glium::Display,
-    pub renderer: conrod::backend::glium::Renderer,
 }
 
 pub enum Continuation {
@@ -98,6 +97,10 @@ impl Program {
             // Render the ui and then display it on the screen.
             self.render(image_map);
         }
+    }
+
+    pub fn widget_id_generator(&mut self) -> conrod::widget::id::Generator {
+        self.ui.widget_id_generator()
     }
 }
 
