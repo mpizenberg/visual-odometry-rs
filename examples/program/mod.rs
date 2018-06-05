@@ -79,6 +79,26 @@ impl Program {
         }
         Continuation::Continue
     }
+
+    pub fn run<Img, F>(&mut self, image_map: &conrod::image::Map<Img>, f: &F) -> ()
+    where
+        Img: std::ops::Deref + conrod::backend::glium::TextureDimensions,
+        for<'a> glium::uniforms::Sampler<'a, Img>: glium::uniforms::AsUniformValue,
+        F: Fn(&mut conrod::UiCell) -> (),
+    {
+        'main: loop {
+            // Handle all events.
+            if let Continuation::Stop = self.process_events() {
+                break 'main;
+            }
+
+            // Instantiate the widgets.
+            self.draw(f);
+
+            // Render the ui and then display it on the screen.
+            self.render(image_map);
+        }
+    }
 }
 
 /// In most of the examples the `glutin` crate is used for providing the window context and

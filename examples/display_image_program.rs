@@ -45,22 +45,11 @@ fn main() {
             .set(ids.texture, ui);
     };
 
-    // Poll events from the window.
-    'main: loop {
-        // Handle all events.
-        if let program::Continuation::Stop = prog.process_events() {
-            break 'main;
-        }
-
-        // Instantiate the widgets.
-        prog.draw(&my_widgets);
-
-        // Render the ui and then display it on the screen.
-        prog.render(&image_map);
-    }
+    // Run forever our program.
+    prog.run(&image_map, &my_widgets);
 }
 
-// Function loading an image from a path
+// Function loading an image from a path.
 fn load_raw_image(path: &str) -> glium::texture::RawImage2d<u8> {
     let img_path = std::path::Path::new(path);
     let img_rgba = image::open(&img_path).expect("Cannot open image").to_rgba();
