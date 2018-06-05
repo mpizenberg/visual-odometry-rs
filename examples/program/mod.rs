@@ -75,7 +75,6 @@ impl Program {
                 .unwrap();
             target.finish().unwrap();
         }
-        ()
     }
 }
 

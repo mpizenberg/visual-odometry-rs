@@ -33,7 +33,7 @@ fn main() {
     let mut image_map = conrod::image::Map::new();
     let texture = image_map.insert(texture);
 
-    let my_widgets = |ui| {
+    let my_widgets = |ui: &mut conrod::UiCell| {
         // Draw a light blue background.
         widget::Canvas::new()
             .color(color::LIGHT_BLUE)
@@ -54,17 +54,6 @@ fn main() {
 
         // Instantiate the widgets.
         prog.draw(&my_widgets);
-        // prog.draw(&|ui| {
-        //     // Draw a light blue background.
-        //     widget::Canvas::new()
-        //         .color(color::LIGHT_BLUE)
-        //         .set(ids.background, ui);
-        //     // Instantiate the `Image` at its full size in the middle of the window.
-        //     widget::Image::new(texture)
-        //         .w_h(w as f64, h as f64)
-        //         .middle()
-        //         .set(ids.texture, ui);
-        // });
 
         // Render the ui and then display it on the screen.
         prog.render(&image_map);
