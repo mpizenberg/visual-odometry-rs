@@ -37,7 +37,10 @@ impl Program {
         }
     }
 
-    pub fn draw(&mut self, f: &Fn(&mut conrod::UiCell) -> ()) -> () {
+    pub fn draw<F>(&mut self, f: &F) -> ()
+    where
+        F: Fn(&mut conrod::UiCell) -> (),
+    {
         // Process higher level events (DoubleClick ...) created by Ui::handle_event.
         let ui_cell = &mut self.ui.set_widgets();
         f(ui_cell)
