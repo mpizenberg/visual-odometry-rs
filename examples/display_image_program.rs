@@ -49,7 +49,7 @@ fn main() {
         }
 
         // Instantiate the widgets.
-        prog.draw(&mut |ui| {
+        prog.draw(&|ui| {
             // Draw a light blue background.
             widget::Canvas::new()
                 .color(color::LIGHT_BLUE)
@@ -61,16 +61,8 @@ fn main() {
                 .set(ids.texture, ui);
         });
 
-        // Render the `Ui` and then display it on the screen.
-        if let Some(primitives) = prog.ui.draw_if_changed() {
-            prog.renderer.fill(&prog.display, primitives, &image_map);
-            let mut target = prog.display.draw();
-            target.clear_color(0.0, 0.0, 0.0, 1.0);
-            prog.renderer
-                .draw(&prog.display, &mut target, &image_map)
-                .unwrap();
-            target.finish().unwrap();
-        }
+        // Render the ui and then display it on the screen.
+        prog.render(&image_map);
     }
 }
 

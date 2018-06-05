@@ -1,6 +1,7 @@
 extern crate conrod;
 
 use conrod::backend::glium::glium;
+use conrod::backend::glium::glium::Surface; // trait
 use std;
 
 pub struct Program {
@@ -31,10 +32,27 @@ impl Program {
         }
     }
 
-    pub fn draw(&mut self, f: &mut FnMut(&mut conrod::UiCell) -> ()) -> () {
+    pub fn draw(&mut self, f: &Fn(&mut conrod::UiCell) -> ()) -> () {
         // Process higher level events (DoubleClick ...) created by Ui::handle_event.
-        let uiCell = &mut self.ui.set_widgets();
-        f(uiCell)
+        let ui_cell = &mut self.ui.set_widgets();
+        f(ui_cell)
+    }
+
+    pub fn render<Img>(&mut self, image_map: &conrod::image::Map<Img>) -> ()
+    where
+        Img: std::ops::Deref + conrod::backend::glium::TextureDimensions,
+        for<'a> glium::uniforms::Sampler<'a, Img>: glium::uniforms::AsUniformValue,
+    {
+        if let Some(primitives) = self.ui.draw_if_changed() {
+            self.renderer.fill(&self.display, primitives, image_map);
+            let mut target = self.display.draw();
+            target.clear_color(0.0, 0.0, 0.0, 1.0); // needs the Surface trait
+            self.renderer
+                .draw(&self.display, &mut target, image_map)
+                .unwrap();
+            target.finish().unwrap();
+        }
+        ()
     }
 }
 
