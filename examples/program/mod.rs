@@ -73,9 +73,9 @@ impl Program {
             match event {
                 glutin::Event::WindowEvent { event, .. } => match event {
                     glutin::WindowEvent::Closed => return Continuation::Stop,
-                    _ => return Continuation::Continue,
+                    _ => (),
                 },
-                _ => return Continuation::Continue,
+                _ => (),
             };
         }
         Continuation::Continue
