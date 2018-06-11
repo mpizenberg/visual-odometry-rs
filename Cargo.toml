@@ -19,3 +19,6 @@ serde_json = "1.0"
 
 # GUI
 conrod = { version = "0.60", features = ["winit", "glium"] }
+
+# Linear algebra
+nalgebra = "0.15"
