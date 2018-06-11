@@ -22,3 +22,6 @@ conrod = { version = "0.60", features = ["winit", "glium"] }
 
 # Linear algebra
 nalgebra = "0.15"
+
+# Random number generators
+rand = "0.5"
