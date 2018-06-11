@@ -5,21 +5,22 @@ extern crate rand;
 
 use na::DVector;
 use rand::distributions::Uniform;
-use rand::thread_rng;
+use rand::{SeedableRng, StdRng};
 
 fn main() {
     // Create vector [0, 0.01, ..., 3]
-    let nb: usize = 4;
+    let nb: usize = 100;
     let domain = linspace(0.0, 3.0, nb);
 
     // Exponential model
     let f = |a: f32| domain.map(|x| (-a * x).exp());
 
     // Noisy data
-    let mut distribution = Uniform::from(0.0..1.0);
-    let mut rng = thread_rng();
+    let seed = [0; 32];
+    let mut rng: StdRng = SeedableRng::from_seed(seed);
+    let mut distribution = Uniform::from(-1.0..1.0);
     let noise: DVector<f32> = DVector::from_distribution(nb, &mut distribution, &mut rng);
-    let data_noise = f(1.3) + 0.05 * noise;
+    let data_noise = f(1.5) + 0.05 * noise;
 
     // Energy
     let res = |a| f(a) - &data_noise;
