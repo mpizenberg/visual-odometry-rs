@@ -1,4 +1,4 @@
-//! Getting started with nalgebra
+//! Gauss Newton optimization for 2D
 
 extern crate nalgebra as na;
 extern crate rand;
@@ -28,7 +28,7 @@ fn main() {
     let seed = [1; 32];
     let mut _rng_seed: StdRng = SeedableRng::from_seed(seed);
     let mut _rng = thread_rng();
-    let mut distribution = Uniform::from(-1.0..1.0);
+    let mut distribution = Uniform::new(-1.0, 1.0);
     let noise: DVector<f32> = DVector::from_distribution(nb * nb, &mut distribution, &mut _rng);
     let data_noise = f(10.0, 3.0) + 0.1 * noise;
 
@@ -49,7 +49,6 @@ fn main() {
     let gradient = |a, b| jacobian(a, b).tr_mul(&res(a, b));
     let hessian = |a, b| {
         let jac = jacobian(a, b);
-        // jac.transpose() * jac
         jac.tr_mul(&jac)
     };
 
