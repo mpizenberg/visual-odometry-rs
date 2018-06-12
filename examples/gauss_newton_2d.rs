@@ -46,14 +46,15 @@ fn main() {
     let jacobian = |a, b| DMatrix::from_columns(&[d_res_a(a, b), d_res_b(a, b)]);
 
     // Gradient and Hessian
-    let gradient = |a, b| jacobian(a, b).tr_mul(&res(a, b));
-    let hessian = |a, b| {
-        let jac = jacobian(a, b);
-        jac.tr_mul(&jac)
-    };
+    // let gradient = |a, b| jacobian(a, b).tr_mul(&res(a, b));
+    // let hessian = |a, b| {
+    //     let jac = jacobian(a, b);
+    //     jac.tr_mul(&jac)
+    // };
 
     // Iteration step
-    let step = |a, b| hessian(a, b).try_inverse().unwrap() * gradient(a, b);
+    let step = |a, b| jacobian(a, b).svd(true, true).solve(&res(a, b), EPSILON);
+    // let step = |a, b| hessian(a, b).try_inverse().unwrap() * gradient(a, b);
 
     // Initialization
     let mut x_n = Vector2::new(5.0, 1.0);
