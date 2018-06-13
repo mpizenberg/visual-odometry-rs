@@ -13,8 +13,8 @@ fn main() {
     // Create a mesh grid
     let nb: usize = 33;
     let (x_grid, y_grid) = meshgrid(-8.0, 8.0, nb);
-    let x_grid = x_grid.resize(nb * nb, 1, 0.0).column(0).into_owned();
-    let y_grid = y_grid.resize(nb * nb, 1, 0.0).column(0).into_owned();
+    let x_grid = DVector::<f32>::from_column_slice(nb * nb, x_grid.as_slice());
+    let y_grid = DVector::<f32>::from_column_slice(nb * nb, y_grid.as_slice());
 
     // Functions of the model
     let radius = |_: f32, b: f32| {
