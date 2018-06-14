@@ -6,7 +6,7 @@ authors = ["Matthieu Pizenberg <matthieu.pizenberg@gmail.com>"]
 [dependencies]
 
 # PistonDevelopers/image. Encoding/decoding images in Rust.
-image = "*"
+image = "0.19"
 
 # The core APIs, including the Serialize and Deserialize traits.
 serde = "1.0"
