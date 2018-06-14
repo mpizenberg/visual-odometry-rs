@@ -1,23 +1,20 @@
 extern crate image;
 
-use std::fs::File;
-use std::path::Path;
-
 // #[allow(dead_code)]
 fn main() {
-    let img_path = Path::new("data/images/0001.png");
-    let img = image::open(&img_path).expect("Cannot open image");
-    let out_path = Path::new("out/resize_gray.png");
-    let mut out_file = File::create(&out_path).expect("Cannot create file");
+    let img_path = "data/images/0001.png";
+    let out_path_str = "out/resize_gray.png";
+    let img = image::open(img_path).expect("Cannot open image");
 
     // flip image along horizontal axis
     // let _ = img.fliph()
-    //     .save(&mut out_file, image::PNG)
+    //     .save(out_path_str)
     //     .expect("Saving image failed");
 
     // resize image to grayscale lower resolution
-    let _ = img.resize(320, 240, image::FilterType::Triangle)
+    img.resize(320, 240, image::FilterType::Triangle)
         .grayscale()
-        .save(&mut out_file, image::PNG)
+        .save(out_path_str)
+        // .write_to(&mut out_file, image::PNG)
         .expect("Saving image failed");
 }
