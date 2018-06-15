@@ -14,9 +14,9 @@ fn main() {
     let img = image::open(&img_path).expect("Cannot open image").to_luma();
 
     // Create an equivalent matrix.
-    let (width, height) = img.dimensions();
-    let raw_buffer: Vec<u8> = img.into_raw();
-    let img_matrix = DMatrix::from_row_slice(height as usize, width as usize, &raw_buffer);
+    let img_matrix = matrix_from_image(img);
+
+    // Create a pyramid hierarchy of half resolution matrices.
     let mat_hierarchy = hierarchy(NB_PIXELS_THRESH, img_matrix);
 
     // Save hierarchy of images.
@@ -68,4 +68,9 @@ fn image_from_matrix(mat: &DMatrix<u8>) -> GrayImage {
         *pixel = image::Luma([mat[(y as usize, x as usize)]]);
     }
     img_buf
+}
+
+fn matrix_from_image(img: GrayImage) -> DMatrix<u8> {
+    let (width, height) = img.dimensions();
+    DMatrix::from_row_slice(height as usize, width as usize, &img.into_raw())
 }
