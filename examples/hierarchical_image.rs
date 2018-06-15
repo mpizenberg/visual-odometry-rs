@@ -1,7 +1,7 @@
 extern crate image;
 extern crate nalgebra as na;
 
-use image::GrayImage;
+use image::{GrayImage, ImageBuffer, Luma};
 use na::DMatrix;
 use std::path::Path;
 
@@ -58,4 +58,13 @@ fn image_from_matrix(mat: &DMatrix<u8>) -> GrayImage {
         *pixel = image::Luma([mat[(y as usize, x as usize)]]);
     }
     img_buf
+}
+
+// Use a borrowed reference to the matrix buffer.
+// Due to a difference of row major instead of column major,
+// this produces a mirrored + rotated image.
+fn image_from_matrix_ref(mat: &DMatrix<u8>) -> ImageBuffer<Luma<u8>, &[u8]> {
+    let (nb_rows, nb_cols) = mat.shape();
+    ImageBuffer::from_raw(nb_rows as u32, nb_cols as u32, mat.as_slice())
+        .expect("Buffer not large enough")
 }
