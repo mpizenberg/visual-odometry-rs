@@ -4,7 +4,7 @@ extern crate nalgebra as na;
 use image::GrayImage;
 use na::DMatrix;
 use std::path::Path;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 // #[allow(dead_code)]
 fn main() {
