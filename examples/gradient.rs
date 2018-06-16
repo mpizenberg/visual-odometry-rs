@@ -41,22 +41,36 @@ fn gradient_2(mat: &DMatrix<u8>) -> (DMatrix<i16>, DMatrix<i16>) {
 
 fn gradient_x(mat: &DMatrix<u8>) -> DMatrix<i16> {
     let (nb_rows, nb_cols) = mat.shape();
-    assert!(nb_rows >= 2);
-    assert!(nb_cols >= 2);
-    mat.slice((1, 2), (nb_rows - 2, nb_cols - 2)).zip_map(
-        &mat.slice((1, 0), (nb_rows - 2, nb_cols - 2)),
-        |x_2, x_0| x_2 as i16 - x_0 as i16,
-    )
+    let mut grad_x = DMatrix::zeros(nb_rows, nb_cols);
+    if nb_rows >= 2 && nb_cols >= 2 {
+        let inner_grad_x = mat.slice((1, 2), (nb_rows - 2, nb_cols - 2)).zip_map(
+            &mat.slice((1, 0), (nb_rows - 2, nb_cols - 2)),
+            |x_2, x_0| x_2 as i16 - x_0 as i16,
+        );
+        for c in 0..(nb_cols - 2) {
+            for r in 0..(nb_rows - 2) {
+                grad_x[(r + 1, c + 1)] = inner_grad_x[(r, c)];
+            }
+        }
+    }
+    grad_x
 }
 
 fn gradient_y(mat: &DMatrix<u8>) -> DMatrix<i16> {
     let (nb_rows, nb_cols) = mat.shape();
-    assert!(nb_rows >= 2);
-    assert!(nb_cols >= 2);
-    mat.slice((2, 1), (nb_rows - 2, nb_cols - 2)).zip_map(
-        &mat.slice((0, 1), (nb_rows - 2, nb_cols - 2)),
-        |y_2, y_0| y_2 as i16 - y_0 as i16,
-    )
+    let mut grad_y = DMatrix::zeros(nb_rows, nb_cols);
+    if nb_rows >= 2 && nb_cols >= 2 {
+        let inner_grad_y = mat.slice((2, 1), (nb_rows - 2, nb_cols - 2)).zip_map(
+            &mat.slice((0, 1), (nb_rows - 2, nb_cols - 2)),
+            |y_2, y_0| y_2 as i16 - y_0 as i16,
+        );
+        for c in 0..(nb_cols - 2) {
+            for r in 0..(nb_rows - 2) {
+                grad_y[(r + 1, c + 1)] = inner_grad_y[(r, c)];
+            }
+        }
+    }
+    grad_y
 }
 
 fn image_from_matrix(mat: &DMatrix<u8>) -> GrayImage {
