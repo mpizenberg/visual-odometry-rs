@@ -43,7 +43,7 @@ fn main() {
 }
 
 fn gradient_2(mat: &DMatrix<u8>) -> (DMatrix<i16>, DMatrix<i16>) {
-    (gradient_x_inner_from_fn(mat), gradient_y_inner_from_fn(mat))
+    (gradient_x_inner_slice(mat), gradient_y_inner_slice(mat))
 }
 
 fn gradient_x(mat: &DMatrix<u8>) -> DMatrix<i16> {
@@ -68,8 +68,6 @@ fn gradient_x_inner_from_fn(mat: &DMatrix<u8>) -> DMatrix<i16> {
 
 fn gradient_x_inner_slice(mat: &DMatrix<u8>) -> DMatrix<i16> {
     let (nb_rows, nb_cols) = mat.shape();
-    assert!(nb_rows >= 2);
-    assert!(nb_cols >= 2);
     mat.slice((1, 2), (nb_rows - 2, nb_cols - 2)).zip_map(
         &mat.slice((1, 0), (nb_rows - 2, nb_cols - 2)),
         |x_2, x_0| x_2 as i16 - x_0 as i16,
@@ -98,8 +96,6 @@ fn gradient_y_inner_from_fn(mat: &DMatrix<u8>) -> DMatrix<i16> {
 
 fn gradient_y_inner_slice(mat: &DMatrix<u8>) -> DMatrix<i16> {
     let (nb_rows, nb_cols) = mat.shape();
-    assert!(nb_rows >= 2);
-    assert!(nb_cols >= 2);
     mat.slice((2, 1), (nb_rows - 2, nb_cols - 2)).zip_map(
         &mat.slice((0, 1), (nb_rows - 2, nb_cols - 2)),
         |y_2, y_0| y_2 as i16 - y_0 as i16,
