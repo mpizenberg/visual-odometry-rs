@@ -90,7 +90,7 @@ fn higher_than_mean_with_thresh(a: u16, b: u16, c: u16, d: u16) -> [bool; 4] {
     let (_, first) = temp[3];
     let (x, second) = temp[2];
     let (y, _) = temp[1];
-    let mut result = [false, false, false, false];
+    let mut result = [false; 4];
     result[first] = true;
     if x > y + thresh {
         result[second] = true;
