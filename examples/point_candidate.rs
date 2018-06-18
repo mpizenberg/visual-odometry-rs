@@ -35,56 +35,40 @@ fn main() {
         .map(half_gradient_norm)
         .collect();
 
-    // // Save pyramid of images.
-    // multires_img.iter().enumerate().for_each(|(i, mat)| {
-    //     let out_name = &["out/img_", i.to_string().as_str(), ".png"].concat();
-    //     interop::image_from_matrix(&mat).save(out_name).unwrap();
-    // });
-    //
-    // // Save pyramid of gradients.
-    // multires_gradient_norm
-    //     .iter()
-    //     .enumerate()
-    //     .for_each(|(i, mat)| {
-    //         let out_name = &["out/gradient_norm_", (i + 1).to_string().as_str(), ".png"].concat();
-    //         interop::image_from_matrix(&mat.map(|x| (x as f32).sqrt() as u8))
-    //             .save(out_name)
-    //             .unwrap();
-    //     });
-
-    let smaller = &multires_gradient_norm.last().unwrap();
-    let (nrows, ncols) = smaller.shape();
-    let premask = DMatrix::repeat(nrows, ncols, true);
-    let second_grad = &multires_gradient_norm[nb_levels - 3];
-    let test = bloc_2x2_filter(&premask, second_grad, higher_than_mean_with_thresh);
-    // save test
-    interop::image_from_matrix(&test.map(|x| if x { 255u8 } else { 0u8 }))
-        .save("out/test.png")
-        .unwrap();
-
     // canditates
-    let point_candidates = candidates(&multires_gradient_norm);
-    interop::image_from_matrix(&point_candidates.map(|x| if x { 255u8 } else { 0u8 }))
-        .save("out/candidates.png")
-        .unwrap();
+    let multires_candidates = candidates(&multires_gradient_norm);
+    multires_candidates
+        .iter()
+        .enumerate()
+        .for_each(|(i, bitmap)| {
+            let out_name = &["out/candidates_", i.to_string().as_str(), ".png"].concat();
+            interop::image_from_matrix(&bitmap.map(|x| if x { 255u8 } else { 0u8 }))
+                .save(out_name)
+                .unwrap();
+        });
 }
 
-fn candidates(gradients: &Vec<DMatrix<u16>>) -> DMatrix<bool> {
+fn candidates(gradients: &Vec<DMatrix<u16>>) -> Vec<DMatrix<bool>> {
     let (nrows, ncols) = gradients.last().unwrap().shape();
     let pre_mask = DMatrix::repeat(nrows, ncols, true);
-    let mask = gradients
+    let mut init_candidates = Vec::new();
+    init_candidates.push(pre_mask);
+    let multires_candidates = gradients
         .iter()
         .rev() // start with lower res
         .skip(1) // skip lower since all points are good
-        .fold(pre_mask.clone(), |mask_acc, grad_mat| {
-            bloc_2x2_filter(&mask_acc, &grad_mat, higher_than_mean_with_thresh)
+        .fold(init_candidates, |mut multires_masks, grad_mat| {
+            let last_mask = multires_masks.pop().unwrap();
+            let new_mask = bloc_2x2_filter(&last_mask, &grad_mat, higher_than_mean_with_thresh);
+            multires_masks.push(last_mask);
+            multires_masks.push(new_mask);
+            multires_masks
         });
-    mask
+    multires_candidates
 }
 
 fn higher_than_mean_with_thresh(a: u16, b: u16, c: u16, d: u16) -> [bool; 4] {
     let thresh = 7;
-    // let mean = (a as u32 + b as u32 + c as u32 + d as u32) / 4;
     let mut temp = [(a, 0usize), (b, 1usize), (c, 2usize), (d, 3usize)];
     temp.sort_unstable_by(|(x, _), (y, _)| x.cmp(y));
     let (_, first) = temp[3];
