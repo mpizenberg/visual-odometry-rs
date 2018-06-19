@@ -8,6 +8,12 @@ authors = ["Matthieu Pizenberg <matthieu.pizenberg@gmail.com>"]
 # PistonDevelopers/image. Encoding/decoding images in Rust.
 image = "0.19"
 
+# PNG decoding and encoding
+png = "0.12"
+
+# Reading numbers in [big/little]-endian.
+byteorder = "1.2"
+
 # The core APIs, including the Serialize and Deserialize traits.
 serde = "1.0"
 
