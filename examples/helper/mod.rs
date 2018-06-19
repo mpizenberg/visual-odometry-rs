@@ -1,9 +1,8 @@
 extern crate byteorder;
-extern crate nalgebra as na;
 extern crate png;
 
-use byteorder::{BigEndian, ReadBytesExt};
-use png::HasParameters;
+use self::byteorder::{BigEndian, ReadBytesExt};
+use self::png::HasParameters;
 use std::fs::File;
 use std::io::Cursor;
 
@@ -24,5 +23,5 @@ pub fn read_png_16bits(file_path: &str) -> Result<(usize, usize, Vec<u16>), png:
     buffer_cursor.read_u16_into::<BigEndian>(&mut buffer_u16)?;
 
     // Return u16 buffer.
-    Ok((info.width, info.height, buffer_u16))
+    Ok((info.width as usize, info.height as usize, buffer_u16))
 }
