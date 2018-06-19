@@ -1,8 +1,8 @@
 extern crate conrod;
 
-use conrod::backend::glium;
-use conrod::backend::glium::glium::Surface; // trait
-use conrod::backend::glium::glium::glutin;
+use self::conrod::backend::glium;
+use self::conrod::backend::glium::glium::Surface; // trait
+use self::conrod::backend::glium::glium::glutin;
 use std;
 
 pub struct Program {
