@@ -58,9 +58,7 @@ fn candidates(gradients: &Vec<DMatrix<u16>>) -> Vec<DMatrix<bool>> {
         .rev() // start with lower res
         .skip(1) // skip lower since all points are good
         .fold(init_candidates, |mut multires_masks, grad_mat| {
-            let last_mask = multires_masks.pop().unwrap();
-            let new_mask = bloc_2x2_filter(&last_mask, &grad_mat, higher_than_mean_with_thresh);
-            multires_masks.push(last_mask);
+            let new_mask = bloc_2x2_filter(&multires_masks.last().unwrap(), &grad_mat, higher_than_mean_with_thresh);
             multires_masks.push(new_mask);
             multires_masks
         });
