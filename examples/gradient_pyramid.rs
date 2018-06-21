@@ -44,12 +44,12 @@ fn main() {
     // Save pyramid of gradients.
     multires_gradient_norm
         .iter()
+        .map(|mat| mat.map(|x| (x as f32).sqrt() as u8))
+        .map(|mat| interop::image_from_matrix(&mat))
         .enumerate()
-        .for_each(|(i, mat)| {
+        .for_each(|(i, img)| {
             let out_name = &["out/gradient_norm_", (i + 1).to_string().as_str(), ".png"].concat();
-            interop::image_from_matrix(&mat.map(|x| (x as f32).sqrt() as u8))
-                .save(out_name)
-                .unwrap();
+            img.save(out_name).unwrap();
         });
 }
 
