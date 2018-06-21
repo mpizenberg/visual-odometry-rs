@@ -1,0 +1,72 @@
+extern crate nalgebra as na;
+
+use self::na::DMatrix;
+
+// Select a subset of points satisfying two conditions:
+//   * points shall be well-distributed in the image.
+//   * higher density where gradients are bigger.
+pub fn select(gradients: &Vec<DMatrix<u16>>) -> Vec<DMatrix<bool>> {
+    let (nrows, ncols) = gradients.last().unwrap().shape();
+    let mut init_candidates = Vec::new();
+    init_candidates.push(DMatrix::repeat(nrows, ncols, true));
+    gradients
+        .iter()
+        .rev() // start with lower res
+        .skip(1) // skip lower since all points are good
+        .fold(init_candidates, |mut multires_masks, grad_mat| {
+            let new_mask = select_2x2_bloc(&multires_masks.last().unwrap(), &grad_mat, prune);
+            multires_masks.push(new_mask);
+            multires_masks
+        })
+}
+
+// Apply a predicate function on each 2x2 bloc.
+// Only evaluate the function on authorized blocs by half res pre_mask.
+fn select_2x2_bloc<F>(pre_mask: &DMatrix<bool>, mat: &DMatrix<u16>, f: F) -> DMatrix<bool>
+where
+    F: Fn(u16, u16, u16, u16) -> [bool; 4],
+{
+    let (nrows, ncols) = mat.shape();
+    let (nrows_2, ncols_2) = pre_mask.shape();
+    assert_eq!((nrows_2, ncols_2), (nrows / 2, ncols / 2));
+    let mut mask = DMatrix::repeat(nrows, ncols, false);
+    for j in 0..(ncols_2) {
+        for i in 0..(nrows_2) {
+            if pre_mask[(i, j)] {
+                let a = mat[(2 * i, 2 * j)];
+                let b = mat[(2 * i + 1, 2 * j)];
+                let c = mat[(2 * i, 2 * j + 1)];
+                let d = mat[(2 * i + 1, 2 * j + 1)];
+                let ok = f(a, b, c, d);
+                mask[(2 * i, 2 * j)] = ok[0];
+                mask[(2 * i + 1, 2 * j)] = ok[1];
+                mask[(2 * i, 2 * j + 1)] = ok[2];
+                mask[(2 * i + 1, 2 * j + 1)] = ok[3];
+            }
+        }
+    }
+    mask
+}
+
+// Discard the 2 or 3 lowest values.
+// The second higher value is kept only if:
+//     second > third + thresh
+//
+// For example: with thresh = 5
+//     ( 0, 1, 8, 9 ) -> [ false, false, true, true ]
+//     ( 0, 9, 1, 8 ) -> [ false, true, false, true ]
+//     ( 1, 0, 9, 0 ) -> [ false, false, true, false ]
+fn prune(a: u16, b: u16, c: u16, d: u16) -> [bool; 4] {
+    let thresh = 7;
+    let mut temp = [(a, 0usize), (b, 1usize), (c, 2usize), (d, 3usize)];
+    temp.sort_unstable_by(|(x, _), (y, _)| x.cmp(y));
+    let (_, first) = temp[3];
+    let (x, second) = temp[2];
+    let (y, _) = temp[1];
+    let mut result = [false; 4];
+    result[first] = true;
+    if x > y + thresh {
+        result[second] = true;
+    }
+    result
+}
