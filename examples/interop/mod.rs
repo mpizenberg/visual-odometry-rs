@@ -1,7 +1,7 @@
 extern crate image;
 extern crate nalgebra as na;
 
-use self::image::{GrayImage, Luma};
+use self::image::{GrayImage, ImageBuffer, Luma};
 use self::na::DMatrix;
 
 pub fn image_from_matrix(mat: &DMatrix<u8>) -> GrayImage {
@@ -11,6 +11,15 @@ pub fn image_from_matrix(mat: &DMatrix<u8>) -> GrayImage {
         *pixel = Luma([mat[(y as usize, x as usize)]]);
     }
     img_buf
+}
+
+// Use a borrowed reference to the matrix buffer.
+// Due to a difference of row major instead of column major,
+// this produces a mirrored + rotated image (transposed image).
+pub fn image_from_matrix_ref(mat: &DMatrix<u8>) -> ImageBuffer<Luma<u8>, &[u8]> {
+    let (nb_rows, nb_cols) = mat.shape();
+    ImageBuffer::from_raw(nb_rows as u32, nb_cols as u32, mat.as_slice())
+        .expect("Buffer not large enough")
 }
 
 pub fn matrix_from_image(img: GrayImage) -> DMatrix<u8> {
