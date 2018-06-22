@@ -8,11 +8,13 @@ pub enum InverseDepth {
 }
 
 // Transform depth value from dataset into an inverse depth value.
-// STD is assimilated to 10cm so variance = ( 1 / 0.10 ) ^ 2 = 100.
+// Acceptable error is assimilated to 1cm at 1m.
+// The difference between 1/1m and 1/1.01m is ~ 0.01
+// So we will take a variance of 0.01^2 = 0.0001
 pub fn from_depth(depth: u16) -> InverseDepth {
     match depth {
         0 => InverseDepth::Unknown,
-        _ => InverseDepth::WithVariance(5000f32 / depth as f32, 100f32),
+        _ => InverseDepth::WithVariance(5000f32 / depth as f32, 0.0001f32),
     }
 }
 
@@ -27,13 +29,12 @@ pub fn visual_enum(idepth: &InverseDepth) -> u8 {
 
 // Fuse 4 sub pixels with inverse depths.
 pub fn fuse(a: InverseDepth, b: InverseDepth, c: InverseDepth, d: InverseDepth) -> InverseDepth {
-    let those_with_variance: Vec<(f32, f32)> =
-        [a, b, c, d].iter().filter_map(with_variance).collect();
-    if those_with_variance.len() == 0 {
-        InverseDepth::Unknown
-    } else {
-        strategy_random(those_with_variance)
-    }
+    strategy_statistically_similar(
+        [a, b, c, d]
+            .iter()
+            .filter_map(with_variance)
+            .collect::<Vec<_>>(),
+    )
 }
 
 fn with_variance(idepth: &InverseDepth) -> Option<(f32, f32)> {
@@ -44,13 +45,89 @@ fn with_variance(idepth: &InverseDepth) -> Option<(f32, f32)> {
     }
 }
 
-// Fusing strategies #############################
+// Merging strategies ############################
 
 fn strategy_random(valid_values: Vec<(f32, f32)>) -> InverseDepth {
-    let (idepth, var) = valid_values.last().unwrap();
-    if rand::random() {
-        InverseDepth::WithVariance(*idepth, *var)
-    } else {
-        InverseDepth::Discarded
+    match valid_values.as_slice() {
+        [(idepth, var)] | [(idepth, var), _] | [(idepth, var), _, _] | [(idepth, var), _, _, _] => {
+            if rand::random() {
+                InverseDepth::WithVariance(*idepth, *var)
+            } else {
+                InverseDepth::Discarded
+            }
+        }
+        _ => InverseDepth::Unknown,
+    }
+}
+
+// In DSO, inverse depth do not have statistical variance
+// but some kind of "weight", proportional to how "trusty" they are.
+// So here, the variance is to be considered as a weight instead.
+fn strategy_dso_mean(valid_values: Vec<(f32, f32)>) -> InverseDepth {
+    match valid_values.as_slice() {
+        [] => InverseDepth::Unknown,
+        [(d1, v1)] => InverseDepth::WithVariance(*d1, *v1),
+        [(d1, v1), (d2, v2)] => {
+            InverseDepth::WithVariance((d1 * v1 + d2 * v2) / (v1 + v2), v1 + v2)
+        }
+        [(d1, v1), (d2, v2), (d3, v3)] => {
+            InverseDepth::WithVariance((d1 * v1 + d2 * v2 + d3 * v3) / (v1 + v2 + v3), v1 + v2 + v3)
+        }
+        [(d1, v1), (d2, v2), (d3, v3), (d4, v4)] => InverseDepth::WithVariance(
+            (d1 * v1 + d2 * v2 + d3 * v3 + d4 * v4) / (v1 + v2 + v3 + v4),
+            v1 + v2 + v3 + v4,
+        ),
+        _ => InverseDepth::Unknown,
+    }
+}
+
+// Only merge inverse depths that are statistically similar.
+fn strategy_statistically_similar(valid_values: Vec<(f32, f32)>) -> InverseDepth {
+    match valid_values.as_slice() {
+        [] => InverseDepth::Unknown,
+        [(d1, v1)] => InverseDepth::WithVariance(*d1, 2.0 * v1), // v = 2/1 * mean
+        [(d1, v1), (d2, v2)] => {
+            let new_d = (d1 * v2 + d2 * v1) / (v1 + v2);
+            let new_v = (v1 + v2) / 2.0; // v = 2/2 * mean
+            let new_std = new_v.sqrt();
+            if (d1 - new_d).abs() < new_std && (d2 - new_d).abs() < new_std {
+                InverseDepth::WithVariance(new_d, new_v)
+            } else {
+                InverseDepth::Discarded
+            }
+        }
+        [(d1, v1), (d2, v2), (d3, v3)] => {
+            let v12 = v1 * v2;
+            let v13 = v1 * v3;
+            let v23 = v2 * v3;
+            let new_d = (d1 * v23 + d2 * v13 + d3 * v12) / (v12 + v13 + v23);
+            let new_v = 2.0 * (v1 + v2 + v3) / 9.0; // v = 2/3 * mean
+            let new_std = new_v.sqrt();
+            if (d1 - new_d).abs() < new_std && (d2 - new_d).abs() < new_std
+                && (d3 - new_d).abs() < new_std
+            {
+                InverseDepth::WithVariance(new_d, new_v)
+            } else {
+                InverseDepth::Discarded
+            }
+        }
+        [(d1, v1), (d2, v2), (d3, v3), (d4, v4)] => {
+            let v123 = v1 * v2 * v3;
+            let v234 = v2 * v3 * v4;
+            let v341 = v3 * v4 * v1;
+            let v412 = v4 * v1 * v2;
+            let sum_v1234 = v123 + v234 + v341 + v412;
+            let new_d = (d1 * v234 + d2 * v341 + d3 * v412 + d4 * v123) / sum_v1234;
+            let new_v = (v1 + v2 + v3 + v4) / 8.0; // v = 2/4 * mean
+            let new_std = new_v.sqrt();
+            if (d1 - new_d).abs() < new_std && (d2 - new_d).abs() < new_std
+                && (d3 - new_d).abs() < new_std && (d4 - new_d).abs() < new_std
+            {
+                InverseDepth::WithVariance(new_d, new_v)
+            } else {
+                InverseDepth::Discarded
+            }
+        }
+        _ => InverseDepth::Unknown,
     }
 }
