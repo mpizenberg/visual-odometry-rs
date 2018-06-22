@@ -32,19 +32,25 @@ pub fn fuse(a: InverseDepth, b: InverseDepth, c: InverseDepth, d: InverseDepth) 
     if those_with_variance.len() == 0 {
         InverseDepth::Unknown
     } else {
-        let (idepth, var) = those_with_variance.last().unwrap();
-        if rand::random() {
-            InverseDepth::WithVariance(*idepth, *var)
-        } else {
-            InverseDepth::Discarded
-        }
+        strategy_random(those_with_variance)
     }
 }
 
-pub fn with_variance(idepth: &InverseDepth) -> Option<(f32, f32)> {
+fn with_variance(idepth: &InverseDepth) -> Option<(f32, f32)> {
     if let InverseDepth::WithVariance(idepth, var) = idepth {
         Some((*idepth, *var))
     } else {
         None
+    }
+}
+
+// Fusing strategies #############################
+
+fn strategy_random(valid_values: Vec<(f32, f32)>) -> InverseDepth {
+    let (idepth, var) = valid_values.last().unwrap();
+    if rand::random() {
+        InverseDepth::WithVariance(*idepth, *var)
+    } else {
+        InverseDepth::Discarded
     }
 }
