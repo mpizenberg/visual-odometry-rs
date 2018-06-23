@@ -39,10 +39,12 @@ fn main() {
     // Evaluate strategies.
     let eval_strat =
         |strat: fn(_) -> _| evaluate_strategy_on(&depth_mat, higher_res_candidate, strat);
-    let (dso_ratio, dso_mse) = eval_strat(inverse_depth::strategy_dso_mean);
-    let (stat_ratio, stat_mse) = eval_strat(inverse_depth::strategy_statistically_similar);
-    println!("DSO: (ratio: {}, mse: {:?})", dso_ratio, dso_mse);
-    println!("Stats: (ratio: {}, mse: {:?})", stat_ratio, stat_mse);
+    let (dso_ratio, dso_rmse) = eval_strat(inverse_depth::strategy_dso_mean);
+    let (stat_ratio, stat_rmse) = eval_strat(inverse_depth::strategy_statistically_similar);
+    let (random_ratio, random_rmse) = eval_strat(inverse_depth::strategy_random);
+    println!("DSO: (ratio: {}, rmse: {:?})", dso_ratio, dso_rmse);
+    println!("Stats: (ratio: {}, rmse: {:?})", stat_ratio, stat_rmse);
+    println!("Random: (ratio: {}, rmse: {:?})", random_ratio, random_rmse);
 }
 
 // Inverse Depth stuff ###############################################
@@ -125,7 +127,7 @@ fn evaluate_idepth(
     } else {
         (
             count as f32 / (height as f32 * width as f32),
-            Some(mse / count as f32),
+            Some((mse / count as f32).sqrt()),
         )
     }
 }
