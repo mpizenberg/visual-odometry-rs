@@ -57,11 +57,13 @@ fn main() {
 
     // Create a multires inverse depth map pyramid
     // with same number of levels than the multires image.
+    let fuse =
+        |a, b, c, d| inverse_depth::fuse(a, b, c, d, inverse_depth::strategy_statistically_similar);
     let multires_inverse_depth = multires::pyramid_with_max_n_levels(
         5,
         inverse_depth_candidates,
         |mat| mat,
-        |mat| multires::halve(&mat, inverse_depth::fuse),
+        |mat| multires::halve(&mat, fuse),
     );
 
     // Save inverse depth pyramid on disk.

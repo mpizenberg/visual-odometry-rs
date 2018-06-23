@@ -18,7 +18,19 @@ pub fn from_depth(depth: u16) -> InverseDepth {
     }
 }
 
-// Visualize as an 8-bits intensity.
+// Transform InverseDepth back into a depth
+// with the same scaling as in the dataset.
+pub fn to_depth(idepth: InverseDepth) -> u16 {
+    match idepth {
+        InverseDepth::WithVariance(x, _) => (5000f32 / x).round() as u16,
+        _ => 0,
+    }
+}
+
+// Visualize the enum as an 8-bits intensity:
+// Unknown:      black
+// Discarded:    gray
+// WithVariance: white
 pub fn visual_enum(idepth: &InverseDepth) -> u8 {
     match idepth {
         InverseDepth::Unknown => 0u8,
@@ -28,8 +40,17 @@ pub fn visual_enum(idepth: &InverseDepth) -> u8 {
 }
 
 // Fuse 4 sub pixels with inverse depths.
-pub fn fuse(a: InverseDepth, b: InverseDepth, c: InverseDepth, d: InverseDepth) -> InverseDepth {
-    strategy_statistically_similar(
+pub fn fuse<F>(
+    a: InverseDepth,
+    b: InverseDepth,
+    c: InverseDepth,
+    d: InverseDepth,
+    strategy: F,
+) -> InverseDepth
+where
+    F: Fn(Vec<(f32, f32)>) -> InverseDepth,
+{
+    strategy(
         [a, b, c, d]
             .iter()
             .filter_map(with_variance)
@@ -47,7 +68,7 @@ fn with_variance(idepth: &InverseDepth) -> Option<(f32, f32)> {
 
 // Merging strategies ############################
 
-fn strategy_random(valid_values: Vec<(f32, f32)>) -> InverseDepth {
+pub fn strategy_random(valid_values: Vec<(f32, f32)>) -> InverseDepth {
     match valid_values.as_slice() {
         [(idepth, var)] | [(idepth, var), _] | [(idepth, var), _, _] | [(idepth, var), _, _, _] => {
             if rand::random() {
@@ -63,7 +84,7 @@ fn strategy_random(valid_values: Vec<(f32, f32)>) -> InverseDepth {
 // In DSO, inverse depth do not have statistical variance
 // but some kind of "weight", proportional to how "trusty" they are.
 // So here, the variance is to be considered as a weight instead.
-fn strategy_dso_mean(valid_values: Vec<(f32, f32)>) -> InverseDepth {
+pub fn strategy_dso_mean(valid_values: Vec<(f32, f32)>) -> InverseDepth {
     match valid_values.as_slice() {
         [] => InverseDepth::Unknown,
         [(d1, v1)] => InverseDepth::WithVariance(*d1, *v1),
@@ -82,7 +103,7 @@ fn strategy_dso_mean(valid_values: Vec<(f32, f32)>) -> InverseDepth {
 }
 
 // Only merge inverse depths that are statistically similar.
-fn strategy_statistically_similar(valid_values: Vec<(f32, f32)>) -> InverseDepth {
+pub fn strategy_statistically_similar(valid_values: Vec<(f32, f32)>) -> InverseDepth {
     match valid_values.as_slice() {
         [] => InverseDepth::Unknown,
         [(d1, v1)] => InverseDepth::WithVariance(*d1, 2.0 * v1), // v = 2/1 * mean
