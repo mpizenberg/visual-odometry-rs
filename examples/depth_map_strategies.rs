@@ -12,25 +12,17 @@ use na::DMatrix;
 
 // #[allow(dead_code)]
 fn main() {
-    // let evaluations: Vec<_> = (0..40).map(evaluate_icl_image).collect();
-    let accum_eval = (0..40).map(evaluate_icl_image).fold(
-        [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
-        |mut acc, eval| {
-            acc[0] = (
-                acc[0].0 + eval[0].0,
-                acc[0].1 + eval[0].0 * eval[0].1.unwrap_or(0.0),
-            );
-            acc[1] = (
-                acc[1].0 + eval[1].0,
-                acc[1].1 + eval[1].0 * eval[1].1.unwrap_or(0.0),
-            );
-            acc[2] = (
-                acc[2].0 + eval[2].0,
-                acc[2].1 + eval[2].0 * eval[2].1.unwrap_or(0.0),
-            );
+    let accum_eval = (0..40)
+        .map(evaluate_icl_image)
+        .fold([(0.0, 0.0); 3], |mut acc, eval| {
+            acc.iter_mut()
+                .zip(eval.iter())
+                .for_each(|(acc_strat, eval_strat)| {
+                    acc_strat.0 += eval_strat.0;
+                    acc_strat.1 += eval_strat.0 * eval_strat.1.unwrap_or(0.0);
+                });
             acc
-        },
-    );
+        });
     let mean_eval_dso = (accum_eval[0].0 / 40.0, accum_eval[0].1 / accum_eval[0].0);
     let mean_eval_stat = (accum_eval[1].0 / 40.0, accum_eval[1].1 / accum_eval[1].0);
     let mean_eval_random = (accum_eval[2].0 / 40.0, accum_eval[2].1 / accum_eval[2].0);
