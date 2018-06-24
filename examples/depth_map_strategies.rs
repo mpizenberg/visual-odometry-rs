@@ -12,45 +12,82 @@ use na::DMatrix;
 
 // #[allow(dead_code)]
 fn main() {
-    // Load a color image and transform into grayscale.
-    let img = image::open("icl-rgb/0.png")
-        .expect("Cannot open image")
-        .to_luma();
-
-    // Create an equivalent matrix.
-    let img_matrix = interop::matrix_from_image(img);
-
-    // Compute pyramid of matrices.
-    let multires_img = multires::mean_pyramid(6, img_matrix);
-
-    // Compute pyramid of gradients (without first level).
-    let multires_gradient_norm = multires::gradients(&multires_img);
-
-    // canditates
-    let multires_candidates = candidates::select(&multires_gradient_norm);
-
-    // Read 16 bits PNG image.
-    let (width, height, buffer_u16) = helper::read_png_16bits("icl-depth/0.png").unwrap();
-
-    // Transform depth map image into a matrix.
-    let depth_mat: DMatrix<u16> = DMatrix::from_row_slice(height, width, buffer_u16.as_slice());
-    let higher_res_candidate = multires_candidates.last().unwrap();
-
-    // Evaluate strategies.
-    let eval_strat =
-        |strat: fn(_) -> _| evaluate_strategy_on(&depth_mat, higher_res_candidate, strat);
-    let (dso_ratio, dso_rmse) = eval_strat(inverse_depth::strategy_dso_mean);
-    let (stat_ratio, stat_rmse) = eval_strat(inverse_depth::strategy_statistically_similar);
-    let (random_ratio, random_rmse) = eval_strat(inverse_depth::strategy_random);
-    println!("DSO: (ratio: {}, rmse: {:?})", dso_ratio, dso_rmse);
-    println!("Stats: (ratio: {}, rmse: {:?})", stat_ratio, stat_rmse);
-    println!("Random: (ratio: {}, rmse: {:?})", random_ratio, random_rmse);
+    // let evaluations: Vec<_> = (0..40).map(evaluate_icl_image).collect();
+    let accum_eval = (0..40).map(evaluate_icl_image).fold(
+        [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
+        |mut acc, eval| {
+            acc[0] = (
+                acc[0].0 + eval[0].0,
+                acc[0].1 + eval[0].0 * eval[0].1.unwrap_or(0.0),
+            );
+            acc[1] = (
+                acc[1].0 + eval[1].0,
+                acc[1].1 + eval[1].0 * eval[1].1.unwrap_or(0.0),
+            );
+            acc[2] = (
+                acc[2].0 + eval[2].0,
+                acc[2].1 + eval[2].0 * eval[2].1.unwrap_or(0.0),
+            );
+            acc
+        },
+    );
+    let mean_eval_dso = (accum_eval[0].0 / 40.0, accum_eval[0].1 / accum_eval[0].0);
+    let mean_eval_stat = (accum_eval[1].0 / 40.0, accum_eval[1].1 / accum_eval[1].0);
+    let mean_eval_random = (accum_eval[2].0 / 40.0, accum_eval[2].1 / accum_eval[2].0);
+    println!("DSO (ratio, rmse): {:?}", mean_eval_dso);
+    println!("Stats (ratio, rmse): {:?}", mean_eval_stat);
+    println!("Random (ratio, rmse): {:?}", mean_eval_random);
 }
 
 // Inverse Depth stuff ###############################################
 
 fn inverse_depth_visual(inverse_mat: &DMatrix<InverseDepth>) -> DMatrix<u8> {
     inverse_mat.map(|idepth| inverse_depth::visual_enum(&idepth))
+}
+
+fn evaluate_icl_image(id: usize) -> [(f32, Option<f32>); 3] {
+    let img_path = &format!("icl-rgb/{}.png", id);
+    let depth_path = &format!("icl-depth/{}.png", id);
+    evaluate_image(img_path, depth_path)
+}
+
+fn evaluate_image(rgb_path: &str, depth_path: &str) -> [(f32, Option<f32>); 3] {
+    // Load a color image and transform into grayscale.
+    let img = image::open(rgb_path).expect("Cannot open image").to_luma();
+    let img_matrix = interop::matrix_from_image(img);
+
+    // Read 16 bits PNG image.
+    let (width, height, buffer_u16) = helper::read_png_16bits(depth_path).unwrap();
+    let depth_map: DMatrix<u16> = DMatrix::from_row_slice(height, width, buffer_u16.as_slice());
+
+    // Evaluate strategies on this image.
+    evaluate_all_strategies_for(img_matrix, depth_map)
+}
+
+fn evaluate_all_strategies_for(
+    img_mat: DMatrix<u8>,
+    depth_map: DMatrix<u16>,
+) -> [(f32, Option<f32>); 3] {
+    // Compute pyramid of matrices.
+    let multires_img = multires::mean_pyramid(6, img_mat);
+
+    // Compute pyramid of gradients (without first level).
+    let multires_gradient_norm = multires::gradients(&multires_img);
+
+    // canditates
+    let multires_candidates = candidates::select(&multires_gradient_norm);
+    let higher_res_candidate = multires_candidates.last().unwrap();
+
+    // Evaluate strategies.
+    let eval_strat =
+        |strat: fn(_) -> _| evaluate_strategy_on(&depth_map, higher_res_candidate, strat);
+    let dso_eval = eval_strat(inverse_depth::strategy_dso_mean);
+    let stat_eval = eval_strat(inverse_depth::strategy_statistically_similar);
+    let random_eval = eval_strat(inverse_depth::strategy_random);
+    // println!("DSO: (ratio: {}, rmse: {:?})", dso_ratio, dso_rmse);
+    // println!("Stats: (ratio: {}, rmse: {:?})", stat_ratio, stat_rmse);
+    // println!("Random: (ratio: {}, rmse: {:?})", random_ratio, random_rmse);
+    [dso_eval, stat_eval, random_eval]
 }
 
 fn evaluate_strategy_on<F>(
