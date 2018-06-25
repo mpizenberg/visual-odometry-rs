@@ -12,23 +12,35 @@ use na::DMatrix;
 
 // #[allow(dead_code)]
 fn main() {
-    let accum_eval = (0..40)
-        .map(evaluate_icl_image)
-        .fold([(0.0, 0.0); 3], |mut acc, eval| {
+    let nb_img = 1509;
+    let accum_eval = (0..nb_img).map(evaluate_icl_image).fold(
+        [(0_f32, 0_f32, 0_f32, std::f32::MAX); 2],
+        |mut acc, eval| {
             acc.iter_mut()
                 .zip(eval.iter())
                 .for_each(|(acc_strat, eval_strat)| {
                     acc_strat.0 += eval_strat.0;
                     acc_strat.1 += eval_strat.0 * eval_strat.1.unwrap_or(0.0);
+                    acc_strat.2 = acc_strat.2.max(eval_strat.1.unwrap_or(0.0));
+                    acc_strat.3 = acc_strat.3.min(eval_strat.1.unwrap_or(0.0));
                 });
             acc
-        });
-    let mean_eval_dso = (accum_eval[0].0 / 40.0, accum_eval[0].1 / accum_eval[0].0);
-    let mean_eval_stat = (accum_eval[1].0 / 40.0, accum_eval[1].1 / accum_eval[1].0);
-    let mean_eval_random = (accum_eval[2].0 / 40.0, accum_eval[2].1 / accum_eval[2].0);
-    println!("DSO (ratio, rmse): {:?}", mean_eval_dso);
-    println!("Stats (ratio, rmse): {:?}", mean_eval_stat);
-    println!("Random (ratio, rmse): {:?}", mean_eval_random);
+        },
+    );
+    let mean_eval_dso = (
+        accum_eval[0].0 / nb_img as f32,
+        accum_eval[0].1 / accum_eval[0].0,
+        accum_eval[0].2,
+        accum_eval[0].3,
+    );
+    let mean_eval_stat = (
+        accum_eval[1].0 / nb_img as f32,
+        accum_eval[1].1 / accum_eval[1].0,
+        accum_eval[1].2,
+        accum_eval[1].3,
+    );
+    println!("DSO (ratio, rmse, max, min): {:?}", mean_eval_dso);
+    println!("Stats (ratio, rmse, max, min): {:?}", mean_eval_stat);
 }
 
 // Inverse Depth stuff ###############################################
@@ -37,13 +49,13 @@ fn inverse_depth_visual(inverse_mat: &DMatrix<InverseDepth>) -> DMatrix<u8> {
     inverse_mat.map(|idepth| inverse_depth::visual_enum(&idepth))
 }
 
-fn evaluate_icl_image(id: usize) -> [(f32, Option<f32>); 3] {
+fn evaluate_icl_image(id: usize) -> [(f32, Option<f32>); 2] {
     let img_path = &format!("icl-rgb/{}.png", id);
     let depth_path = &format!("icl-depth/{}.png", id);
     evaluate_image(img_path, depth_path)
 }
 
-fn evaluate_image(rgb_path: &str, depth_path: &str) -> [(f32, Option<f32>); 3] {
+fn evaluate_image(rgb_path: &str, depth_path: &str) -> [(f32, Option<f32>); 2] {
     // Load a color image and transform into grayscale.
     let img = image::open(rgb_path).expect("Cannot open image").to_luma();
     let img_matrix = interop::matrix_from_image(img);
@@ -59,7 +71,7 @@ fn evaluate_image(rgb_path: &str, depth_path: &str) -> [(f32, Option<f32>); 3] {
 fn evaluate_all_strategies_for(
     img_mat: DMatrix<u8>,
     depth_map: DMatrix<u16>,
-) -> [(f32, Option<f32>); 3] {
+) -> [(f32, Option<f32>); 2] {
     // Compute pyramid of matrices.
     let multires_img = multires::mean_pyramid(6, img_mat);
 
@@ -79,7 +91,7 @@ fn evaluate_all_strategies_for(
     // println!("DSO: (ratio: {}, rmse: {:?})", dso_ratio, dso_rmse);
     // println!("Stats: (ratio: {}, rmse: {:?})", stat_ratio, stat_rmse);
     // println!("Random: (ratio: {}, rmse: {:?})", random_ratio, random_rmse);
-    [dso_eval, stat_eval, random_eval]
+    [dso_eval, stat_eval]
 }
 
 fn evaluate_strategy_on<F>(
