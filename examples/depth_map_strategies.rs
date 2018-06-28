@@ -1,11 +1,12 @@
+extern crate computer_vision_rs as cv;
 extern crate image;
 extern crate nalgebra as na;
 
-mod candidates;
-mod helper;
-mod interop;
-mod inverse_depth;
-mod multires;
+use cv::candidates;
+use cv::helper;
+use cv::interop;
+use cv::inverse_depth;
+use cv::multires;
 
 use inverse_depth::InverseDepth;
 use na::DMatrix;
@@ -45,10 +46,6 @@ fn main() {
 
 // Inverse Depth stuff ###############################################
 
-fn inverse_depth_visual(inverse_mat: &DMatrix<InverseDepth>) -> DMatrix<u8> {
-    inverse_mat.map(|idepth| inverse_depth::visual_enum(&idepth))
-}
-
 fn evaluate_icl_image(id: usize) -> [(f32, Option<f32>); 2] {
     let img_path = &format!("icl-rgb/{}.png", id);
     let depth_path = &format!("icl-depth/{}.png", id);
@@ -87,10 +84,7 @@ fn evaluate_all_strategies_for(
         |strat: fn(_) -> _| evaluate_strategy_on(&depth_map, higher_res_candidate, strat);
     let dso_eval = eval_strat(inverse_depth::strategy_dso_mean);
     let stat_eval = eval_strat(inverse_depth::strategy_statistically_similar);
-    let random_eval = eval_strat(inverse_depth::strategy_random);
-    // println!("DSO: (ratio: {}, rmse: {:?})", dso_ratio, dso_rmse);
-    // println!("Stats: (ratio: {}, rmse: {:?})", stat_ratio, stat_rmse);
-    // println!("Random: (ratio: {}, rmse: {:?})", random_ratio, random_rmse);
+    let _random_eval = eval_strat(inverse_depth::strategy_random);
     [dso_eval, stat_eval]
 }
 

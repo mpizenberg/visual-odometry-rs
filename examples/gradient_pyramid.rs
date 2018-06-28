@@ -1,10 +1,11 @@
+extern crate computer_vision_rs as cv;
 extern crate image;
 extern crate nalgebra as na;
 extern crate num_traits;
 extern crate num_traits as num;
 
-mod interop;
-mod multires;
+use cv::interop;
+use cv::multires;
 
 use na::DMatrix;
 

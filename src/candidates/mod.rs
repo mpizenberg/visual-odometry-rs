@@ -1,6 +1,4 @@
-extern crate nalgebra as na;
-
-use self::na::DMatrix;
+use nalgebra::DMatrix;
 
 // Select a subset of points satisfying two conditions:
 //   * points shall be well-distributed in the image.

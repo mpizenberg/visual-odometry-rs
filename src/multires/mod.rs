@@ -1,6 +1,4 @@
-extern crate nalgebra as na;
-
-use self::na::{DMatrix, Scalar};
+use nalgebra::{DMatrix, Scalar};
 
 pub fn pyramid_with_max_n_levels<I, F, T, U>(
     levels: usize,

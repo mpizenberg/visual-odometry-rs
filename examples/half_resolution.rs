@@ -1,8 +1,9 @@
+extern crate computer_vision_rs as cv;
 extern crate image;
 extern crate nalgebra as na;
 extern crate num_traits as num;
 
-mod interop;
+use cv::interop;
 
 use na::{DMatrix, Scalar};
 use num::NumCast;

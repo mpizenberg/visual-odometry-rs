@@ -1,8 +1,5 @@
-extern crate byteorder;
-extern crate png;
-
-use self::byteorder::{BigEndian, ReadBytesExt};
-use self::png::HasParameters;
+use byteorder::{BigEndian, ReadBytesExt};
+use png::{self, HasParameters};
 use std::fs::File;
 use std::io::Cursor;
 

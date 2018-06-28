@@ -1,8 +1,5 @@
-extern crate image;
-extern crate nalgebra as na;
-
-use self::image::{GrayImage, ImageBuffer, Luma};
-use self::na::DMatrix;
+use image::{GrayImage, ImageBuffer, Luma};
+use nalgebra::DMatrix;
 
 pub fn image_from_matrix(mat: &DMatrix<u8>) -> GrayImage {
     let (nb_rows, nb_cols) = mat.shape();

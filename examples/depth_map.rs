@@ -1,11 +1,12 @@
+extern crate computer_vision_rs as cv;
 extern crate image;
 extern crate nalgebra as na;
 
-mod candidates;
-mod helper;
-mod interop;
-mod inverse_depth;
-mod multires;
+use cv::candidates;
+use cv::helper;
+use cv::interop;
+use cv::inverse_depth;
+use cv::multires;
 
 use inverse_depth::InverseDepth;
 use na::DMatrix;

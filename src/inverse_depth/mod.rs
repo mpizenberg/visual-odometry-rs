@@ -1,4 +1,4 @@
-extern crate rand;
+use rand;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum InverseDepth {

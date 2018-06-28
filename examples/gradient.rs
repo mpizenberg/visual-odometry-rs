@@ -1,7 +1,8 @@
+extern crate computer_vision_rs as cv;
 extern crate image;
 extern crate nalgebra as na;
 
-mod interop;
+use cv::interop;
 
 use na::DMatrix;
 use std::path::Path;
