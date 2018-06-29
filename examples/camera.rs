@@ -29,10 +29,18 @@ fn main() {
         RowVector4::new(0.176407, 0.001444, -0.984316, 1.457656),
         RowVector4::new(0.0, 0.0, 0.0, 1.0),
     ]));
+    let proj_600 = Projective3::from_matrix_unchecked(Matrix4::from_rows(&[
+        RowVector4::new(-0.733957, 0.247028, -0.632679, 1.043566),
+        RowVector4::new(0.311943, 0.950058, 0.009070, 1.085034),
+        RowVector4::new(0.603322, -0.190703, -0.774360, 0.687636),
+        RowVector4::new(0.0, 0.0, 0.0, 1.0),
+    ]));
     let proj_01 = proj_1 * proj_0.inverse();
     let proj_050 = proj_50 * proj_0.inverse();
+    let proj_0600 = proj_600 * proj_0.inverse();
     // println!("Projection 0 to 1: {}", proj_01.unwrap());
-    println!("Projection 0 to 50: {}", proj_050.unwrap());
+    // println!("Projection 0 to 50: {}", proj_050.unwrap());
+    println!("Projection 0 to 600: {}", proj_0600.unwrap());
     let orientation_0 = UnitQuaternion::from_quaternion(Quaternion::new(1.0, 0.0, 0.0, 0.0));
     let orientation_1 = UnitQuaternion::from_quaternion(Quaternion::new(
         0.999999,
@@ -46,8 +54,12 @@ fn main() {
         0.0775787,
         0.0444655,
     ));
+    let orientation_600 =
+        UnitQuaternion::from_quaternion(Quaternion::new(0.933403, 0.0471923, 0.322162, 0.150811));
     let rotation_01 = orientation_0.rotation_to(&orientation_1);
     let rotation_050 = orientation_0.rotation_to(&orientation_50);
+    let rotation_0600 = orientation_0.rotation_to(&orientation_600);
     // println!("Rotation 0 to 1: {}", rotation_01.to_rotation_matrix());
-    println!("Rotation 0 to 50: {}", rotation_050.to_rotation_matrix());
+    // println!("Rotation 0 to 50: {}", rotation_050.to_rotation_matrix());
+    println!("Rotation 0 to 600: {}", rotation_0600.to_rotation_matrix());
 }
