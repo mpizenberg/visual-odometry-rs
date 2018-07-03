@@ -1,7 +1,7 @@
 extern crate computer_vision_rs as cv;
 extern crate nalgebra;
 
-use cv::camera::{Camera, Extrinsics, Intrinsics};
+use cv::camera::{Camera, Extrinsics, Float, Intrinsics};
 use nalgebra::{Point2, Quaternion, Translation3, UnitQuaternion};
 
 fn main() {
@@ -36,12 +36,43 @@ fn main() {
 
     // Back project the bottom left corner in both frame 1 and 600.
     // We should normally obtain the same 3D point.
+    same_3d_back_projected(
+        (bl_pos_1, bl_depth_1),
+        (bl_pos_600, bl_depth_600),
+        &camera_1,
+        &camera_600,
+    );
+
+    // Bottom right picture frame corner in frame 1.
+    let br_pos_1 = Point2::new(556.0, 276.0);
+    let br_depth_1 = 16990.0 / 5000.0;
+
+    // Bottom right picture frame corner in frame 600.
+    let br_pos_600 = Point2::new(242.0, 188.0);
+    let br_depth_600 = 14500.0 / 5000.0;
+
+    // Back project the bottom right corner in both frame 1 and 600.
+    // We should normally obtain the same 3D point.
+    same_3d_back_projected(
+        (br_pos_1, br_depth_1),
+        (br_pos_600, br_depth_600),
+        &camera_1,
+        &camera_600,
+    );
+}
+
+fn same_3d_back_projected(
+    point1: (Point2<Float>, Float),
+    point2: (Point2<Float>, Float),
+    camera1: &Camera,
+    camera2: &Camera,
+) -> () {
     println!(
-        "Back Projected 1: {}",
-        camera_1.back_project(bl_pos_1, bl_depth_1)
+        "Back projection in first frame: {}",
+        camera1.back_project(point1.0, point1.1)
     );
     println!(
-        "Back Projected 600: {}",
-        camera_600.back_project(bl_pos_600, bl_depth_600)
+        "Back projection in second frame: {}",
+        camera2.back_project(point2.0, point2.1)
     );
 }

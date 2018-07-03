@@ -1,6 +1,6 @@
 use nalgebra::{Affine2, Matrix3, Point2, Point3, Translation3, UnitQuaternion, Vector3};
 
-type Float = f32;
+pub type Float = f32;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Camera {
