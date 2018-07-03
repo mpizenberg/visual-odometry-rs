@@ -9,7 +9,7 @@ fn main() {
     let intrinsics = Intrinsics {
         principal_point: (319.5, 239.5),
         focal_length: 1.0,
-        scaling: (481.20, 480.00),
+        scaling: (481.20, -480.00),
         skew: 0.0,
     };
 

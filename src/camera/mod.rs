@@ -43,11 +43,11 @@ impl Extrinsics {
     }
 
     pub fn project(&self, point: Point3<Float>) -> Point3<Float> {
-        self.translation * (self.rotation * point)
+        self.rotation.inverse() * (self.translation.inverse() * point)
     }
 
     pub fn back_project(&self, point: Point3<Float>) -> Point3<Float> {
-        self.rotation.inverse() * (self.translation.inverse() * point)
+        self.translation * (self.rotation * point)
     }
 }
 
