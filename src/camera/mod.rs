@@ -30,11 +30,11 @@ impl Camera {
 
     pub fn multi_res(self, n: usize) -> Vec<Camera> {
         self.intrinsics
+            .clone()
             .multi_res(n)
-            .into_inter()
+            .into_iter()
             .map(|intrinsics| Self::new(intrinsics, self.extrinsics.clone()))
             .collect()
-        // Vec::new()
     }
 }
 
