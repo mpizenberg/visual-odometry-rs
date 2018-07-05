@@ -34,3 +34,6 @@ rand = "0.5"
 
 # Useful numeric traits
 num-traits = "0.2"
+
+# Parsing files
+nom = "4"

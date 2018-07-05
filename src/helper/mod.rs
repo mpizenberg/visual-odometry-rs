@@ -1,5 +1,7 @@
 use byteorder::{BigEndian, ReadBytesExt};
+use nalgebra::{DMatrix, Scalar};
 use png::{self, HasParameters};
+use std;
 use std::fs::File;
 use std::io::Cursor;
 
@@ -21,4 +23,30 @@ pub fn read_png_16bits(file_path: &str) -> Result<(usize, usize, Vec<u16>), png:
 
     // Return u16 buffer.
     Ok((info.width as usize, info.height as usize, buffer_u16))
+}
+
+pub fn zip_mask_map<T, U, F>(mat: &DMatrix<T>, mask: &DMatrix<bool>, default: U, f: F) -> DMatrix<U>
+where
+    T: Scalar,
+    U: Scalar,
+    F: Fn(T) -> U,
+{
+    mat.zip_map(mask, |x, is_true| if is_true { f(x) } else { default })
+}
+
+// Compute the quotient and remainder both at the same time.
+pub fn div_rem<T>(x: T, y: T) -> (T, T)
+where
+    T: std::ops::Div<Output = T> + std::ops::Rem<Output = T> + Copy,
+{
+    (x / y, x % y)
+}
+
+// Check that a coordinate is in the bounds of an image of a given size.
+pub fn in_image_bounds(pos: (f32, f32), shape: (usize, usize)) -> bool {
+    let x = pos.0;
+    let y = pos.1;
+    let nrows = shape.0;
+    let ncols = shape.1;
+    0.0 <= x && x <= (ncols - 1) as f32 && 0.0 <= y && y <= (nrows - 1) as f32
 }
