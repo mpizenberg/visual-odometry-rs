@@ -44,11 +44,6 @@ fn main() {
 
     // Transform depth map into an InverseDepth matrix.
     let inverse_depth_mat = half_res_depth.map(inverse_depth::from_depth);
-    let viridis = &colormap::viridis()[0..256];
-    let (d_min, d_max) = min_max(&inverse_depth_mat).unwrap();
-    interop::rgb_from_matrix(&inverse_depth_mat.map(
-            |idepth| inverse_depth::to_color(viridis, d_min, d_max, &idepth))
-        ).save("out/idepth_color.png").unwrap();
 
     // Only keep InverseDepth values corresponding to point candidates.
     // This is to emulate result of back projection of known points into a new keyframe.
@@ -61,6 +56,7 @@ fn main() {
                 InverseDepth::Unknown
             }
         });
+    save_color_depth(&inverse_depth_candidates, "out/idepth_candidates_color.png");
 
     // Create a multires inverse depth map pyramid
     // with same number of levels than the multires image.
@@ -101,4 +97,12 @@ fn min_max(idepth_map: &DMatrix<InverseDepth>) -> Option<(f32, f32)> {
         }
     });
     Some((min_temp, max_temp))
+}
+
+fn save_color_depth(idepth_map: &DMatrix<InverseDepth>, path: &str) -> () {
+    let viridis = &colormap::viridis()[0..256];
+    let (d_min, d_max) = min_max(idepth_map).unwrap();
+    interop::rgb_from_matrix(&idepth_map.map(
+            |idepth| inverse_depth::to_color(viridis, d_min, d_max, &idepth))
+        ).save(path).unwrap();
 }
