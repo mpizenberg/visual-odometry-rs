@@ -12,21 +12,20 @@ use cv::optimization;
 
 use nalgebra::DMatrix;
 
-fn open_icl_data(id: u32) -> Result<(DMatrix<u8>, DMatrix<u16>), image::ImageError> {
-    let img_mat =
-        interop::matrix_from_image(image::open(&format!("icl-rgb/{}.png", id))?.to_luma());
-    let (w, h, buffer) = helper::read_png_16bits(&format!("icl-depth/{}.png", id))?;
-    let depth_map = DMatrix::from_row_slice(h, w, buffer.as_slice());
-    Ok((img_mat, depth_map))
-}
+const INTRINSICS: Intrinsics = Intrinsics {
+    principal_point: (319.5, 239.5),
+    focal_length: 1.0,
+    scaling: (481.20, -480.00),
+    skew: 0.0,
+};
 
 // #[allow(dead_code)]
 fn main() {
-    // Load the rgb and depth images of frame 1.
-    let (rgb_1, depth_1) = open_icl_data(1).unwrap();
+    let all_extrinsics = Extrinsics::read_from_tum_file("data/trajectory-gt.txt").unwrap();
+    let (multires_camera_1, multires_rgb_1, depth_1) =
+        prepare_icl_data(1, &all_extrinsics).unwrap();
+    let (multires_camera_2, multires_rgb_2, _) = prepare_icl_data(600, &all_extrinsics).unwrap();
 
-    // Compute candidates points.
-    let multires_rgb_1 = multires::mean_pyramid(6, rgb_1);
     let candidates = candidates::select(&multires::gradients(&multires_rgb_1))
         .pop()
         .unwrap();
@@ -43,27 +42,13 @@ fn main() {
         inverse_depth::from_depth,
     );
 
-    // Load camera extrinsics ground truth and camera intrinsics.
-    let intrinsics = Intrinsics {
-        principal_point: (319.5, 239.5),
-        focal_length: 1.0,
-        scaling: (481.20, -480.00),
-        skew: 0.0,
-    };
-    let extrinsics = Extrinsics::read_from_tum_file("data/trajectory-gt.txt").unwrap();
-    let camera_1_multires = Camera::new(intrinsics.clone(), extrinsics[0].clone()).multi_res(6);
-    let camera_600_multires = Camera::new(intrinsics.clone(), extrinsics[599].clone()).multi_res(6);
-
-    let (rgb_600, _) = open_icl_data(600).unwrap();
-    let multires_rgb_600 = multires::mean_pyramid(6, rgb_600);
-
     let eval_strat = |strat: fn(_) -> _| {
         eval_strategy_reprojection(
             idepth_candidates.clone(),
             &multires_rgb_1,
-            &multires_rgb_600,
-            &camera_1_multires,
-            &camera_600_multires,
+            &multires_rgb_2,
+            &multires_camera_1,
+            &multires_camera_2,
             strat,
         )
     };
@@ -73,6 +58,27 @@ fn main() {
     println!("Reprojection error (statistical): {:?}", stat_eval);
     println!("Reprojection error (DSO): {:?}", dso_eval);
     println!("Reprojection error (random): {:?}", _random_eval);
+}
+
+fn prepare_icl_data(
+    id: usize,
+    extrinsics: &Vec<Extrinsics>,
+) -> Result<(Vec<Camera>, Vec<DMatrix<u8>>, DMatrix<u16>), image::ImageError> {
+    // Load the rgb and depth image.
+    let (rgb, depth) = open_icl_data(id)?;
+    Ok((
+        Camera::new(INTRINSICS.clone(), extrinsics[id - 1].clone()).multi_res(6),
+        multires::mean_pyramid(6, rgb),
+        depth,
+    ))
+}
+
+fn open_icl_data(id: usize) -> Result<(DMatrix<u8>, DMatrix<u16>), image::ImageError> {
+    let img_mat =
+        interop::matrix_from_image(image::open(&format!("icl-rgb/{}.png", id))?.to_luma());
+    let (w, h, buffer) = helper::read_png_16bits(&format!("icl-depth/{}.png", id))?;
+    let depth_map = DMatrix::from_row_slice(h, w, buffer.as_slice());
+    Ok((img_mat, depth_map))
 }
 
 fn eval_strategy_reprojection<F>(
