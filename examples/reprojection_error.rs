@@ -62,35 +62,67 @@ fn main() {
     };
     let extrinsics = Extrinsics::read_from_tum_file("data/trajectory-gt.txt").unwrap();
     println!("nb images: {}", extrinsics.len());
-    let camera_1 = Camera::new(intrinsics.clone(), extrinsics[1].clone());
-    let camera_600 = Camera::new(intrinsics.clone(), extrinsics[600].clone());
+    let camera_1_multires = Camera::new(intrinsics.clone(), extrinsics[0].clone()).multi_res(6);
+    let camera_600_multires = Camera::new(intrinsics.clone(), extrinsics[599].clone()).multi_res(6);
 
     // On lower res image, re-project candidates on new image.
-    // let (rgb_600, _) = open_icl_data(600).unwrap();
-    // let multires_rgb_600 = multires::mean_pyramid(6, rgb_600);
-    let lower_res_idepth = multires_idepth_statistical.last().unwrap();
-    // let lower_res_rgb_1 = multires_rgb_1.last().unwrap();
-    // let lower_res_rgb_600 = multires_rgb_600.last().unwrap();
-    // let mut reprojection_error = 0.0;
+    let (rgb_600, _) = open_icl_data(600).unwrap();
+    let multires_rgb_600 = multires::mean_pyramid(6, rgb_600);
+    let lower_res_camera_1 = &camera_1_multires[2];
+    let lower_res_camera_600 = &camera_600_multires[2];
+    let lower_res_idepth = &multires_idepth_statistical[1];
+    let lower_res_rgb_1 = &multires_rgb_1[2];
+    let lower_res_rgb_600 = &multires_rgb_600[2];
+    let mut reprojection_error = 0.0;
     let mut total_weight = 0.0;
     let (nrows, ncols) = lower_res_idepth.shape();
+    let mut projected = DMatrix::repeat(nrows, ncols, InverseDepth::Unknown);
     lower_res_idepth
         .iter()
         .enumerate()
         .for_each(|(index, idepth_enum)| {
             if let InverseDepth::WithVariance(idepth, variance) = idepth_enum {
                 let (col, row) = helper::div_rem(index, nrows);
-                let current_weight = 1.0 / variance;
-                let reprojected = camera_600.project(
-                    camera_1.back_project(Point2::new(col as f32, row as f32), 1.0 / idepth),
+                let reprojected = lower_res_camera_600.project(
+                    lower_res_camera_1
+                        .back_project(Point2::new(col as f32, row as f32), 1.0 / idepth),
                 );
                 let new_pos = reprojected.as_slice();
                 let x = new_pos[0] / new_pos[2];
                 let y = new_pos[1] / new_pos[2];
                 if helper::in_image_bounds((x, y), (nrows, ncols)) {
+                    let current_weight = 1.0 / variance;
                     total_weight += current_weight;
+                    let u = x.floor() as usize;
+                    let v = y.floor() as usize;
+                    let a = x - u as f32;
+                    let b = y - v as f32;
+                    // to be optimized
+                    let img_xy = (1.0 - a) * (1.0 - b) * lower_res_rgb_600[(v, u)] as f32
+                        + (1.0 - a) * b * lower_res_rgb_600[(v + 1, u)] as f32
+                        + a * (1.0 - b) * lower_res_rgb_600[(v, u + 1)] as f32
+                        + a * b * lower_res_rgb_600[(v + 1, u + 1)] as f32;
+                    // to be optimized
+                    let img_orig = lower_res_rgb_1[(row, col)] as f32;
+                    reprojection_error += current_weight * (img_xy - img_orig).abs();
+                    unsafe {
+                        *(projected.get_unchecked_mut(y.round() as usize, x.round() as usize)) =
+                            idepth_enum.clone();
+                    }
                 }
             }
         });
+    reprojection_error = reprojection_error / total_weight;
     println!("total weight: {}", total_weight);
+    println!("reprojection error: {}", reprojection_error);
+    interop::image_from_matrix(&inverse_depth_visual(&lower_res_idepth))
+        .save("out/idepth_orig.png")
+        .unwrap();
+    interop::image_from_matrix(&inverse_depth_visual(&projected))
+        .save("out/idepth_projected.png")
+        .unwrap();
+}
+
+fn inverse_depth_visual(inverse_mat: &DMatrix<InverseDepth>) -> DMatrix<u8> {
+    inverse_mat.map(|idepth| inverse_depth::visual_enum(&idepth))
 }

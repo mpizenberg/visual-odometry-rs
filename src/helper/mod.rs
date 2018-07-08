@@ -48,5 +48,5 @@ pub fn in_image_bounds(pos: (f32, f32), shape: (usize, usize)) -> bool {
     let y = pos.1;
     let nrows = shape.0;
     let ncols = shape.1;
-    0.0 <= x && x <= (ncols - 1) as f32 && 0.0 <= y && y <= (nrows - 1) as f32
+    0.0 <= x && x < (ncols - 1) as f32 && 0.0 <= y && y < (nrows - 1) as f32
 }

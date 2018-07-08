@@ -73,6 +73,17 @@ fn main() {
         &camera_1,
         &camera_600,
     );
+
+    // At half resolution.
+    println!("\nHalf resolution:");
+    let bl_pos_1_half = 0.5 * bl_pos_1;
+    let bl_pos_600_half = 0.5 * bl_pos_600;
+    same_3d_back_projected(
+        (bl_pos_1_half, bl_depth_1),
+        (bl_pos_600_half, bl_depth_600),
+        &camera_1.half_res(),
+        &camera_600.half_res(),
+    );
 }
 
 fn same_3d_back_projected(
