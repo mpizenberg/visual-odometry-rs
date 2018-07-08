@@ -36,6 +36,10 @@ impl Camera {
             .map(|intrinsics| Self::new(intrinsics, self.extrinsics.clone()))
             .collect()
     }
+
+    pub fn half_res(&self) -> Camera {
+        Self::new(self.intrinsics.half_res(), self.extrinsics.clone())
+    }
 }
 
 // EXTRINSICS ##############################################
@@ -80,10 +84,10 @@ impl Extrinsics {
             assert_eq!(8, values.len(), "There was an issue in parsing:\n{}", line);
             let translation = Translation3::new(values[1], values[2], values[3]);
             let rotation = UnitQuaternion::from_quaternion(Quaternion::new(
+                values[7],
                 values[4],
                 values[5],
                 values[6],
-                values[7],
             ));
             extrinsics.push(Extrinsics::new(translation, rotation));
         }
