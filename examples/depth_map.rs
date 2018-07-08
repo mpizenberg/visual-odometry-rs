@@ -3,6 +3,7 @@ extern crate image;
 extern crate nalgebra as na;
 
 use cv::candidates;
+use cv::colormap;
 use cv::helper;
 use cv::interop;
 use cv::inverse_depth;
@@ -43,6 +44,11 @@ fn main() {
 
     // Transform depth map into an InverseDepth matrix.
     let inverse_depth_mat = half_res_depth.map(inverse_depth::from_depth);
+    let viridis = &colormap::viridis()[0..256];
+    let (d_min, d_max) = min_max(&inverse_depth_mat).unwrap();
+    interop::rgb_from_matrix(&inverse_depth_mat.map(
+            |idepth| inverse_depth::to_color(viridis, d_min, d_max, &idepth))
+        ).save("out/idepth_color.png").unwrap();
 
     // Only keep InverseDepth values corresponding to point candidates.
     // This is to emulate result of back projection of known points into a new keyframe.
@@ -83,4 +89,16 @@ fn main() {
 
 fn inverse_depth_visual(inverse_mat: &DMatrix<InverseDepth>) -> DMatrix<u8> {
     inverse_mat.map(|idepth| inverse_depth::visual_enum(&idepth))
+}
+
+fn min_max(idepth_map: &DMatrix<InverseDepth>) -> Option<(f32, f32)> {
+    let mut min_temp = 10000.0_f32;
+    let mut max_temp = 0.0_f32;
+    idepth_map.iter().for_each(|idepth| {
+        if let Some((d,_)) = inverse_depth::with_variance(idepth) {
+            min_temp = min_temp.min(d);
+            max_temp = max_temp.max(d);
+        }
+    });
+    Some((min_temp, max_temp))
 }

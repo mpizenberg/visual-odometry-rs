@@ -28,6 +28,8 @@ pub fn to_depth(idepth: InverseDepth) -> u16 {
     }
 }
 
+// Visualizations ##########################################
+
 // Visualize the enum as an 8-bits intensity:
 // Unknown:      black
 // Discarded:    gray
@@ -39,6 +41,25 @@ pub fn visual_enum(idepth: &InverseDepth) -> u8 {
         InverseDepth::WithVariance(_, _) => 255u8,
     }
 }
+
+// Use viridis colormap + red for Discarded
+pub fn to_color(
+    colormap: &[(u8, u8, u8)],
+    d_min: f32,
+    d_max: f32,
+    idepth: &InverseDepth,
+) -> (u8, u8, u8) {
+    match idepth {
+        InverseDepth::Unknown => (0, 0, 0),
+        InverseDepth::Discarded => (255, 0, 0),
+        InverseDepth::WithVariance(d, _) => {
+            let idx = (255.0 * (d - d_min) / (d_max - d_min)).round() as usize;
+            colormap[idx]
+        }
+    }
+}
+
+// Merging strategies ######################################
 
 // Fuse 4 sub pixels with inverse depths.
 pub fn fuse<F>(
@@ -59,15 +80,13 @@ where
     )
 }
 
-fn with_variance(idepth: &InverseDepth) -> Option<(f32, f32)> {
+pub fn with_variance(idepth: &InverseDepth) -> Option<(f32, f32)> {
     if let InverseDepth::WithVariance(idepth, var) = idepth {
         Some((*idepth, *var))
     } else {
         None
     }
 }
-
-// Merging strategies ############################
 
 pub fn strategy_random(valid_values: Vec<(f32, f32)>) -> InverseDepth {
     match valid_values.as_slice() {

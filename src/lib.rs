@@ -6,6 +6,7 @@ extern crate rand;
 
 pub mod camera;
 pub mod candidates;
+pub mod colormap;
 pub mod helper;
 pub mod interop;
 pub mod inverse_depth;
