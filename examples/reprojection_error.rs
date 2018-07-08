@@ -43,16 +43,6 @@ fn main() {
         inverse_depth::from_depth,
     );
 
-    // Create a multires inverse depth map pyramid.
-    let fuse_statistical =
-        |a, b, c, d| inverse_depth::fuse(a, b, c, d, inverse_depth::strategy_statistically_similar);
-    let multires_idepth_statistical = multires::pyramid_with_max_n_levels(
-        5,
-        idepth_candidates,
-        |mat| mat,
-        |mat| multires::halve(&mat, fuse_statistical),
-    );
-
     // Load camera extrinsics ground truth and camera intrinsics.
     let intrinsics = Intrinsics {
         principal_point: (319.5, 239.5),
@@ -61,30 +51,64 @@ fn main() {
         skew: 0.0,
     };
     let extrinsics = Extrinsics::read_from_tum_file("data/trajectory-gt.txt").unwrap();
-    println!("nb images: {}", extrinsics.len());
     let camera_1_multires = Camera::new(intrinsics.clone(), extrinsics[0].clone()).multi_res(6);
     let camera_600_multires = Camera::new(intrinsics.clone(), extrinsics[599].clone()).multi_res(6);
 
-    // On lower res image, re-project candidates on new image.
     let (rgb_600, _) = open_icl_data(600).unwrap();
     let multires_rgb_600 = multires::mean_pyramid(6, rgb_600);
-    let lower_res_camera_1 = &camera_1_multires[2];
-    let lower_res_camera_600 = &camera_600_multires[2];
-    let lower_res_idepth = &multires_idepth_statistical[1];
-    let lower_res_rgb_1 = &multires_rgb_1[2];
-    let lower_res_rgb_600 = &multires_rgb_600[2];
-    println!(
-        "reprojection error: {}",
-        optimization::reprojection_error(
-            lower_res_idepth,
-            lower_res_camera_1,
-            lower_res_camera_600,
-            lower_res_rgb_1,
-            lower_res_rgb_600
+
+    let eval_strat = |strat: fn(_) -> _| {
+        eval_strategy_reprojection(
+            idepth_candidates.clone(),
+            &multires_rgb_1,
+            &multires_rgb_600,
+            &camera_1_multires,
+            &camera_600_multires,
+            strat,
         )
-    );
+    };
+    let dso_eval = eval_strat(inverse_depth::strategy_dso_mean);
+    let stat_eval = eval_strat(inverse_depth::strategy_statistically_similar);
+    let _random_eval = eval_strat(inverse_depth::strategy_random);
+    println!("Reprojection error (statistical): {:?}", stat_eval);
+    println!("Reprojection error (DSO): {:?}", dso_eval);
+    println!("Reprojection error (random): {:?}", _random_eval);
 }
 
-fn inverse_depth_visual(inverse_mat: &DMatrix<InverseDepth>) -> DMatrix<u8> {
-    inverse_mat.map(|idepth| inverse_depth::visual_enum(&idepth))
+fn eval_strategy_reprojection<F>(
+    idepth_candidates: DMatrix<InverseDepth>,
+    multires_rgb_1: &Vec<DMatrix<u8>>,
+    multires_rgb_2: &Vec<DMatrix<u8>>,
+    multires_camera_1: &Vec<Camera>,
+    multires_camera_2: &Vec<Camera>,
+    strategy: F,
+) -> Vec<f32>
+where
+    F: Fn(Vec<(f32, f32)>) -> InverseDepth,
+{
+    // Create a multires inverse depth map pyramid.
+    let fuse = |a, b, c, d| inverse_depth::fuse(a, b, c, d, &strategy);
+    let multires_idepth = multires::pyramid_with_max_n_levels(
+        5,
+        idepth_candidates,
+        |mat| mat,
+        |mat| multires::halve(&mat, fuse),
+    );
+
+    // Re-project candidates on new image at each level.
+    (1..6)
+        .map(|n| {
+            optimization::reprojection_error(
+                &multires_idepth[n - 1],
+                &multires_camera_1[n],
+                &multires_camera_2[n],
+                &multires_rgb_1[n],
+                &multires_rgb_2[n],
+            )
+        })
+        .collect()
 }
+
+// fn inverse_depth_visual(inverse_mat: &DMatrix<InverseDepth>) -> DMatrix<u8> {
+//     inverse_mat.map(|idepth| inverse_depth::visual_enum(&idepth))
+// }
