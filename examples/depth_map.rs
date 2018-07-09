@@ -70,20 +70,14 @@ fn main() {
     // Save inverse depth pyramid on disk.
     multires_inverse_depth
         .iter()
-        .map(inverse_depth_visual)
-        .map(|mat| interop::image_from_matrix(&mat))
         .enumerate()
         .for_each(|(i, bitmap)| {
             let out_name = &["out/idepth_", i.to_string().as_str(), ".png"].concat();
-            bitmap.save(out_name).unwrap();
+            save_color_depth(bitmap, out_name);
         });
 }
 
 // Inverse Depth stuff ###############################################
-
-fn inverse_depth_visual(inverse_mat: &DMatrix<InverseDepth>) -> DMatrix<u8> {
-    inverse_mat.map(|idepth| inverse_depth::visual_enum(&idepth))
-}
 
 fn min_max(idepth_map: &DMatrix<InverseDepth>) -> Option<(f32, f32)> {
     let mut min_temp = 10000.0_f32;
