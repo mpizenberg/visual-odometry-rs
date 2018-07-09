@@ -109,15 +109,17 @@ pub fn strategy_dso_mean(valid_values: Vec<(f32, f32)>) -> InverseDepth {
         [] => InverseDepth::Unknown,
         [(d1, v1)] => InverseDepth::WithVariance(*d1, *v1),
         [(d1, v1), (d2, v2)] => {
-            InverseDepth::WithVariance((d1 * v1 + d2 * v2) / (v1 + v2), v1 + v2)
+            let sum = v1 + v2;
+            InverseDepth::WithVariance((d1 * v1 + d2 * v2) / sum, sum)
         }
         [(d1, v1), (d2, v2), (d3, v3)] => {
-            InverseDepth::WithVariance((d1 * v1 + d2 * v2 + d3 * v3) / (v1 + v2 + v3), v1 + v2 + v3)
+            let sum = v1 + v2 + v3;
+            InverseDepth::WithVariance((d1 * v1 + d2 * v2 + d3 * v3) / sum, sum)
         }
-        [(d1, v1), (d2, v2), (d3, v3), (d4, v4)] => InverseDepth::WithVariance(
-            (d1 * v1 + d2 * v2 + d3 * v3 + d4 * v4) / (v1 + v2 + v3 + v4),
-            v1 + v2 + v3 + v4,
-        ),
+        [(d1, v1), (d2, v2), (d3, v3), (d4, v4)] => {
+            let sum = v1 + v2 + v3 + v4;
+            InverseDepth::WithVariance((d1 * v1 + d2 * v2 + d3 * v3 + d4 * v4) / sum, sum)
+        }
         _ => InverseDepth::Unknown,
     }
 }
