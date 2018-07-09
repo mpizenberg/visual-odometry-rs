@@ -8,6 +8,7 @@ pub mod camera;
 pub mod candidates;
 pub mod colormap;
 pub mod helper;
+pub mod icl_nuim;
 pub mod interop;
 pub mod inverse_depth;
 pub mod multires;

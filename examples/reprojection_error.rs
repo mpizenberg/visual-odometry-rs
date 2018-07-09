@@ -2,29 +2,23 @@ extern crate computer_vision_rs as cv;
 extern crate image;
 extern crate nalgebra;
 
-use cv::camera::{Camera, Extrinsics, Intrinsics};
+use cv::camera::{Camera, Extrinsics};
 use cv::candidates;
 use cv::helper;
-use cv::interop;
+use cv::icl_nuim;
 use cv::inverse_depth::{self, InverseDepth};
 use cv::multires;
 use cv::optimization;
 
 use nalgebra::DMatrix;
 
-const INTRINSICS: Intrinsics = Intrinsics {
-    principal_point: (319.5, 239.5),
-    focal_length: 1.0,
-    scaling: (481.20, -480.00),
-    skew: 0.0,
-};
-
 // #[allow(dead_code)]
 fn main() {
     let all_extrinsics = Extrinsics::read_from_tum_file("data/trajectory-gt.txt").unwrap();
     let (multires_camera_1, multires_rgb_1, depth_1) =
-        prepare_icl_data(1, &all_extrinsics).unwrap();
-    let (multires_camera_2, multires_rgb_2, _) = prepare_icl_data(600, &all_extrinsics).unwrap();
+        icl_nuim::prepare_data(1, &all_extrinsics).unwrap();
+    let (multires_camera_2, multires_rgb_2, _) =
+        icl_nuim::prepare_data(600, &all_extrinsics).unwrap();
 
     let candidates = candidates::select(&multires::gradients(&multires_rgb_1))
         .pop()
@@ -47,27 +41,6 @@ fn main() {
     // println!("Reprojection error (random): {:?}", _random_eval);
     println!("Reprojection error (DSO): {:?}", dso_eval);
     println!("Reprojection error (statistical): {:?}", stat_eval);
-}
-
-fn prepare_icl_data(
-    id: usize,
-    extrinsics: &Vec<Extrinsics>,
-) -> Result<(Vec<Camera>, Vec<DMatrix<u8>>, DMatrix<u16>), image::ImageError> {
-    // Load the rgb and depth image.
-    let (rgb, depth) = open_icl_data(id)?;
-    Ok((
-        Camera::new(INTRINSICS.clone(), extrinsics[id - 1].clone()).multi_res(6),
-        multires::mean_pyramid(6, rgb),
-        depth,
-    ))
-}
-
-fn open_icl_data(id: usize) -> Result<(DMatrix<u8>, DMatrix<u16>), image::ImageError> {
-    let img_mat =
-        interop::matrix_from_image(image::open(&format!("icl-rgb/{}.png", id))?.to_luma());
-    let (w, h, buffer) = helper::read_png_16bits(&format!("icl-depth/{}.png", id))?;
-    let depth_map = DMatrix::from_row_slice(h, w, buffer.as_slice());
-    Ok((img_mat, depth_map))
 }
 
 fn eval_strategy_reprojection<F>(
@@ -104,9 +77,6 @@ where
     // Re-project candidates on new image at each level.
     (1..6)
         .map(|n| {
-            if n == 0 {
-                display_few(&multires_idepth[n - 1]);
-            }
             optimization::reprojection_error(
                 &multires_idepth[n - 1],
                 &multires_camera_1[n],
@@ -117,17 +87,3 @@ where
         })
         .collect()
 }
-
-fn display_few(mat: &DMatrix<InverseDepth>) -> () {
-    println!(
-        "{:?}",
-        mat.iter()
-            .filter_map(|d| inverse_depth::with_variance(&d))
-            .take(40)
-            .collect::<Vec<_>>()
-    );
-}
-
-// fn inverse_depth_visual(inverse_mat: &DMatrix<InverseDepth>) -> DMatrix<u8> {
-//     inverse_mat.map(|idepth| inverse_depth::visual_enum(&idepth))
-// }
