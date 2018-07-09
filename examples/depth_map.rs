@@ -3,11 +3,11 @@ extern crate image;
 extern crate nalgebra as na;
 
 use cv::candidates;
-use cv::colormap;
 use cv::helper;
 use cv::interop;
 use cv::inverse_depth;
 use cv::multires;
+use cv::view;
 
 use inverse_depth::InverseDepth;
 use na::DMatrix;
@@ -37,7 +37,6 @@ fn main() {
     // Transform depth map image into a matrix.
     let depth_mat: DMatrix<u16> = DMatrix::from_row_slice(height, width, buffer_u16.as_slice());
 
-
     // Create an inverse depth map with values only at point candidates.
     // This is to emulate result of back projection of known points into a new keyframe.
     let half_res_depth = multires::halve(&depth_mat, |a, b, c, d| {
@@ -47,14 +46,18 @@ fn main() {
         let d = inverse_depth::from_depth(d);
         inverse_depth::fuse(a, b, c, d, inverse_depth::strategy_statistically_similar)
     }).unwrap();
-    save_color_depth(&half_res_depth, "out/half_res_depth_color.png");
+    view::color_idepth(&half_res_depth)
+        .save("out/half_res_depth_color.png")
+        .unwrap();
     let inverse_depth_candidates = helper::zip_mask_map(
         &half_res_depth,
         &multires_candidates.last().unwrap(),
         InverseDepth::Unknown,
         |idepth| idepth,
     );
-    save_color_depth(&inverse_depth_candidates, "out/idepth_candidates_color.png");
+    view::color_idepth(&inverse_depth_candidates)
+        .save("out/idepth_candidates_color.png")
+        .unwrap();
 
     // Create a multires inverse depth map pyramid
     // with same number of levels than the multires image.
@@ -73,28 +76,6 @@ fn main() {
         .enumerate()
         .for_each(|(i, bitmap)| {
             let out_name = &["out/idepth_", i.to_string().as_str(), ".png"].concat();
-            save_color_depth(bitmap, out_name);
+            view::color_idepth(bitmap).save(out_name).unwrap();
         });
-}
-
-// Inverse Depth stuff ###############################################
-
-fn min_max(idepth_map: &DMatrix<InverseDepth>) -> Option<(f32, f32)> {
-    let mut min_temp = 10000.0_f32;
-    let mut max_temp = 0.0_f32;
-    idepth_map.iter().for_each(|idepth| {
-        if let Some((d,_)) = inverse_depth::with_variance(idepth) {
-            min_temp = min_temp.min(d);
-            max_temp = max_temp.max(d);
-        }
-    });
-    Some((min_temp, max_temp))
-}
-
-fn save_color_depth(idepth_map: &DMatrix<InverseDepth>, path: &str) -> () {
-    let viridis = &colormap::viridis()[0..256];
-    let (d_min, d_max) = min_max(idepth_map).unwrap();
-    interop::rgb_from_matrix(&idepth_map.map(
-            |idepth| inverse_depth::to_color(viridis, d_min, d_max, &idepth))
-        ).save(path).unwrap();
 }

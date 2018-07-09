@@ -12,3 +12,4 @@ pub mod interop;
 pub mod inverse_depth;
 pub mod multires;
 pub mod optimization;
+pub mod view;
