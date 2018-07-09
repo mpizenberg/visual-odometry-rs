@@ -37,25 +37,23 @@ fn main() {
     // Transform depth map image into a matrix.
     let depth_mat: DMatrix<u16> = DMatrix::from_row_slice(height, width, buffer_u16.as_slice());
 
-    // Create a half resolution depth map to fit resolution of candidates map.
-    let half_res_depth = multires::halve(&depth_mat, |a, b, c, d| {
-        ((a as u32 + b as u32 + c as u32 + d as u32) / 4) as u16
-    }).unwrap();
 
-    // Transform depth map into an InverseDepth matrix.
-    let inverse_depth_mat = half_res_depth.map(inverse_depth::from_depth);
-
-    // Only keep InverseDepth values corresponding to point candidates.
+    // Create an inverse depth map with values only at point candidates.
     // This is to emulate result of back projection of known points into a new keyframe.
-    let higher_res_candidate = multires_candidates.last().unwrap();
-    let inverse_depth_candidates =
-        higher_res_candidate.zip_map(&inverse_depth_mat, |is_candidate, idepth| {
-            if is_candidate {
-                idepth
-            } else {
-                InverseDepth::Unknown
-            }
-        });
+    let half_res_depth = multires::halve(&depth_mat, |a, b, c, d| {
+        let a = inverse_depth::from_depth(a);
+        let b = inverse_depth::from_depth(b);
+        let c = inverse_depth::from_depth(c);
+        let d = inverse_depth::from_depth(d);
+        inverse_depth::fuse(a, b, c, d, inverse_depth::strategy_statistically_similar)
+    }).unwrap();
+    save_color_depth(&half_res_depth, "out/half_res_depth_color.png");
+    let inverse_depth_candidates = helper::zip_mask_map(
+        &half_res_depth,
+        &multires_candidates.last().unwrap(),
+        InverseDepth::Unknown,
+        |idepth| idepth,
+    );
     save_color_depth(&inverse_depth_candidates, "out/idepth_candidates_color.png");
 
     // Create a multires inverse depth map pyramid

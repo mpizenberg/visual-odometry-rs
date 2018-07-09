@@ -14,8 +14,8 @@ pub enum InverseDepth {
 pub fn from_depth(depth: u16) -> InverseDepth {
     match depth {
         0 => InverseDepth::Unknown,
-        // _ => InverseDepth::WithVariance(5000f32 / depth as f32, 0.000001f32),
-        _ => InverseDepth::WithVariance(5000f32 / depth as f32, 0.1f32),
+        _ => InverseDepth::WithVariance(5000f32 / depth as f32, 0.0001f32),
+        // _ => InverseDepth::WithVariance(5000f32 / depth as f32, 0.1f32),
     }
 }
 

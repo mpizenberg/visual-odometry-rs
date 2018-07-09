@@ -24,40 +24,29 @@ fn main() {
     let all_extrinsics = Extrinsics::read_from_tum_file("data/trajectory-gt.txt").unwrap();
     let (multires_camera_1, multires_rgb_1, depth_1) =
         prepare_icl_data(1, &all_extrinsics).unwrap();
-    let (multires_camera_2, multires_rgb_2, _) = prepare_icl_data(2, &all_extrinsics).unwrap();
+    let (multires_camera_2, multires_rgb_2, _) = prepare_icl_data(600, &all_extrinsics).unwrap();
 
     let candidates = candidates::select(&multires::gradients(&multires_rgb_1))
         .pop()
         .unwrap();
 
-    // Create an inverse depth map with values only at point candidates.
-    // This is to emulate result of back projection of known points into a new keyframe.
-    let half_res_depth = multires::halve(&depth_1, |a, b, c, d| {
-        ((a as u32 + b as u32 + c as u32 + d as u32) / 4) as u16
-    }).unwrap();
-    let idepth_candidates = helper::zip_mask_map(
-        &half_res_depth,
-        &candidates,
-        InverseDepth::Unknown,
-        inverse_depth::from_depth,
-    );
-
     let eval_strat = |strat: fn(_) -> _| {
         eval_strategy_reprojection(
-            idepth_candidates.clone(),
             &multires_rgb_1,
             &multires_rgb_2,
             &multires_camera_1,
             &multires_camera_2,
+            &depth_1,
+            &candidates,
             strat,
         )
     };
+    // let _random_eval = eval_strat(inverse_depth::strategy_random);
     let dso_eval = eval_strat(inverse_depth::strategy_dso_mean);
     let stat_eval = eval_strat(inverse_depth::strategy_statistically_similar);
-    let _random_eval = eval_strat(inverse_depth::strategy_random);
-    println!("Reprojection error (statistical): {:?}", stat_eval);
+    // println!("Reprojection error (random): {:?}", _random_eval);
     println!("Reprojection error (DSO): {:?}", dso_eval);
-    println!("Reprojection error (random): {:?}", _random_eval);
+    println!("Reprojection error (statistical): {:?}", stat_eval);
 }
 
 fn prepare_icl_data(
@@ -82,18 +71,29 @@ fn open_icl_data(id: usize) -> Result<(DMatrix<u8>, DMatrix<u16>), image::ImageE
 }
 
 fn eval_strategy_reprojection<F>(
-    idepth_candidates: DMatrix<InverseDepth>,
     multires_rgb_1: &Vec<DMatrix<u8>>,
     multires_rgb_2: &Vec<DMatrix<u8>>,
     multires_camera_1: &Vec<Camera>,
     multires_camera_2: &Vec<Camera>,
+    depth_map: &DMatrix<u16>,
+    candidates: &DMatrix<bool>,
     strategy: F,
 ) -> Vec<f32>
 where
     F: Fn(Vec<(f32, f32)>) -> InverseDepth,
 {
-    // Create a multires inverse depth map pyramid.
+    // Create an inverse depth map with values only at point candidates.
+    // This is to emulate result of back projection of known points into a new keyframe.
     let fuse = |a, b, c, d| inverse_depth::fuse(a, b, c, d, &strategy);
+    let half_res_depth = multires::halve(&depth_map.map(inverse_depth::from_depth), fuse).unwrap();
+    let idepth_candidates = helper::zip_mask_map(
+        &half_res_depth,
+        &candidates,
+        InverseDepth::Unknown,
+        |idepth| idepth,
+    );
+
+    // Create a multires inverse depth map pyramid.
     let multires_idepth = multires::pyramid_with_max_n_levels(
         5,
         idepth_candidates,
@@ -104,6 +104,9 @@ where
     // Re-project candidates on new image at each level.
     (1..6)
         .map(|n| {
+            if n == 0 {
+                display_few(&multires_idepth[n - 1]);
+            }
             optimization::reprojection_error(
                 &multires_idepth[n - 1],
                 &multires_camera_1[n],
@@ -113,6 +116,16 @@ where
             )
         })
         .collect()
+}
+
+fn display_few(mat: &DMatrix<InverseDepth>) -> () {
+    println!(
+        "{:?}",
+        mat.iter()
+            .filter_map(|d| inverse_depth::with_variance(&d))
+            .take(40)
+            .collect::<Vec<_>>()
+    );
 }
 
 // fn inverse_depth_visual(inverse_mat: &DMatrix<InverseDepth>) -> DMatrix<u8> {
