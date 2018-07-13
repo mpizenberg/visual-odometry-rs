@@ -1,5 +1,3 @@
-extern crate nalgebra;
-
 use camera::Camera;
 use helper;
 use inverse_depth::InverseDepth;
@@ -40,15 +38,13 @@ pub fn reprojection_error(
                 let img_orig = rgb_1[(row, col)] as f32;
                 reprojection_error_accum += (img_xy - img_orig).abs();
                 unsafe {
+                    // Copying idepth_enum is wrong for the new inverse depth
+                    // but simplest for enum visualization.
                     *(projected.get_unchecked_mut(y.round() as usize, x.round() as usize)) =
                         idepth_enum.clone();
                 }
             }
         }
     });
-    // println!("total weight: {}", total_weight);
-    // interop::image_from_matrix(&inverse_depth_visual(&projected))
-    //     .save("out/idepth_projected.png")
-    //     .unwrap();
     reprojection_error_accum / total_count as f32
 }
