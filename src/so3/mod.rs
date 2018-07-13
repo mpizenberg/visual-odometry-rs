@@ -51,7 +51,7 @@ pub fn exp(w: Element) -> (UnitQuaternion<Float>, Float) {
 
 // Compute the logarithm map from the Lie group SO3 to the Lie algebra so3.
 // Inverse of the exponential map.
-// Also returns the form of the Lie algebra element.
+// Also returns the norm of the Lie algebra element.
 //
 // Computation taken from the Sophus library.
 //
