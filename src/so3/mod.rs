@@ -65,19 +65,19 @@ pub fn log(rotation: UnitQuaternion<Float>) -> (Element, Float) {
     let imag_vector = rotation.vector();
     let imag_norm_2 = imag_vector.norm_squared();
     let imag_norm = imag_norm_2.sqrt();
-    let scalar = rotation.scalar();
+    let real_factor = rotation.scalar();
     let theta;
     let tangent;
     if imag_norm < EPSILON {
-        let scalar_2 = scalar * scalar;
-        let atan_coef = 2.0 * (1.0 - imag_norm_2 / scalar_2) / scalar;
+        let real_factor_2 = real_factor * real_factor;
+        let atan_coef = 2.0 * (1.0 - imag_norm_2 / real_factor_2) / real_factor;
         theta = atan_coef * imag_norm;
         tangent = atan_coef * imag_vector;
-    } else if scalar.abs() < EPSILON {
-        theta = if scalar > 0.0 { PI } else { -PI };
+    } else if real_factor.abs() < EPSILON {
+        theta = if real_factor > 0.0 { PI } else { -PI };
         tangent = (theta / imag_norm) * imag_vector;
     } else {
-        theta = 2.0 * (imag_norm / scalar).atan();
+        theta = 2.0 * (imag_norm / real_factor).atan();
         tangent = (theta / imag_norm) * imag_vector;
     }
     (tangent, theta)
