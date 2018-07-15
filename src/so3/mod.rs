@@ -74,7 +74,7 @@ pub fn log(rotation: UnitQuaternion<Float>) -> (Element, Float) {
         theta = atan_coef * imag_norm;
         tangent = atan_coef * imag_vector;
     } else if real_factor.abs() < EPSILON {
-        theta = if real_factor > 0.0 { PI } else { -PI };
+        theta = if real_factor >= 0.0 { PI } else { -PI };
         tangent = (theta / imag_norm) * imag_vector;
     } else {
         theta = 2.0 * (imag_norm / real_factor).atan();
