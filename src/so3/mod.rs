@@ -115,3 +115,23 @@ pub fn log(rotation: UnitQuaternion<Float>) -> (Element, Float) {
     }
     (tangent, theta)
 }
+
+// TESTS #############################################################
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn exp_log_round_trip() {
+        let w = Vector3::zeros();
+        assert_eq!(w, round_trip_from_algebra(w));
+    }
+
+    fn round_trip_from_algebra(w: Element) -> Element {
+        let (rotation, _) = exp(w);
+        let (new_w, _) = log(rotation);
+        new_w
+    }
+}
