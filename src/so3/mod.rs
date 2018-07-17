@@ -1,3 +1,9 @@
+// Interesting reads
+// * Sophus c++ library: https://github.com/strasdat/Sophus
+// * Ethan Eade course on Lie Groups for 2D and 3D transformations:
+//     * details: http://ethaneade.com/lie.pdf
+//     * summary: http://ethaneade.com/lie_groups.pdf
+
 use nalgebra::{Matrix3, Quaternion, UnitQuaternion, Vector3};
 use std::f32::consts::PI;
 
@@ -18,6 +24,31 @@ pub fn hat(w: Element) -> Matrix3<Float> {
     let w2 = w[1];
     let w3 = w[2];
     Matrix3::from_column_slice(&[0.0, w3, -w2, -w3, 0.0, w1, w2, -w1, 0.0])
+}
+
+// Squared hat operator (hat_2(w) == hat(w) * hat(w)).
+// PS: result is a symmetric matrix.
+pub fn hat_2(w: Element) -> Matrix3<Float> {
+    let w1 = w[0];
+    let w2 = w[1];
+    let w3 = w[2];
+    let w11 = w1 * w1;
+    let w12 = w1 * w2;
+    let w22 = w2 * w2;
+    let w23 = w2 * w3;
+    let w33 = w3 * w3;
+    let w13 = w1 * w3;
+    Matrix3::from_column_slice(&[
+        -w22 - w33,
+        w12,
+        w13,
+        w12,
+        -w11 - w33,
+        w23,
+        w13,
+        w23,
+        -w11 - w22,
+    ])
 }
 
 // Vee operator.
