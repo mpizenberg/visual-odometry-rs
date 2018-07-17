@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 
 pub type Float = f32;
 
-const EPSILON: Float = 1e-10;
+const EPSILON: Float = 1e-2;
 const _1_8: Float = 0.125;
 const _1_48: Float = 1.0 / 48.0;
 const _1_384: Float = 1.0 / 384.0;
@@ -37,8 +37,10 @@ pub fn exp(w: Element) -> (UnitQuaternion<Float>, Float) {
     let real_factor;
     let imag_factor;
     if theta < EPSILON {
-        real_factor = 1.0 - theta_2 * (_1_8 - theta_2 * _1_384);
-        imag_factor = 0.5 - theta_2 * (_1_48 - theta_2 * _1_3840);
+        // real_factor = 1.0 - theta_2 * (_1_8 - theta_2 * _1_384);
+        // imag_factor = 0.5 - theta_2 * (_1_48 - theta_2 * _1_3840);
+        real_factor = 1.0 - _1_8 * theta_2;
+        imag_factor = 0.5 - _1_48 * theta_2;
     } else {
         let half_theta = 0.5 * theta;
         real_factor = half_theta.cos();
