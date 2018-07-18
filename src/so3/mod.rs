@@ -219,6 +219,13 @@ mod tests {
         }
     }
 
+    quickcheck! {
+        fn hat_vee_roundtrip(x: Float, y: Float, z: Float) -> bool {
+            let element = Vector3::new(x,y,z);
+            element == vee(hat(element))
+        }
+    }
+
     // GENERATORS ####################################################
 
     fn gen_rotation(roll: Float, pitch: Float, yaw: Float) -> UnitQuaternion<Float> {
