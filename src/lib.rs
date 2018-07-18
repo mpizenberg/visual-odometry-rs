@@ -16,3 +16,13 @@ pub mod optimization;
 pub mod se3;
 pub mod so3;
 pub mod view;
+
+// Test dependencies
+
+#[cfg(test)]
+#[macro_use]
+extern crate quickcheck;
+
+#[cfg(test)]
+#[macro_use]
+extern crate approx;

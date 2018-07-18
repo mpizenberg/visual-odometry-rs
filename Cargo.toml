@@ -37,3 +37,11 @@ num-traits = "0.2"
 
 # Parsing files
 nom = "4"
+
+[dev-dependencies]
+
+# Property based testing
+quickcheck = "0.6"
+
+# Approximate equalities
+approx = "0.2"
