@@ -208,6 +208,17 @@ mod tests {
         }
     }
 
+    quickcheck! {
+        fn hat_2_ok(x: Float, y: Float, z: Float) -> bool {
+            let element = Vector3::new(x,y,z);
+            abs_diff_eq!(
+                hat_2(element),
+                hat(element) * hat(element),
+                epsilon = EPSILON_ROUNDTRIP_APPROX
+            )
+        }
+    }
+
     // GENERATORS ####################################################
 
     fn gen_rotation(roll: Float, pitch: Float, yaw: Float) -> UnitQuaternion<Float> {
