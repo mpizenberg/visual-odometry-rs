@@ -9,12 +9,13 @@ use so3;
 
 pub type Float = f32;
 
-const EPSILON: Float = 1e-2;
+const EPSILON_TAYLOR: Float = 1e-2;
 const _1_6: Float = 1.0 / 6.0;
 const _1_12: Float = 1.0 / 12.0;
 const _1_24: Float = 1.0 / 24.0;
 const _1_120: Float = 1.0 / 120.0;
 
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub struct Twist {
     v: Vector3<Float>,
     w: so3::Element,
@@ -52,7 +53,7 @@ pub fn exp(xi: Twist) -> Isometry3<Float> {
     let (rotation, theta) = so3::exp(xi.w);
     let theta_2 = theta * theta;
     let (omega, omega_2) = (so3::hat(xi.w), so3::hat_2(xi.w));
-    let v = if theta < EPSILON {
+    let v = if theta < EPSILON_TAYLOR {
         Matrix3::identity() + (0.5 - _1_24 * theta_2) * omega + (_1_6 - _1_120 * theta_2) * omega_2
     } else {
         Matrix3::identity() + (1.0 - theta.cos()) / theta_2 * omega
@@ -66,7 +67,7 @@ pub fn exp(xi: Twist) -> Isometry3<Float> {
 pub fn log(iso: Isometry3<Float>) -> Twist {
     let (w, theta) = so3::log(iso.rotation);
     let (omega, omega_2) = (so3::hat(w), so3::hat_2(w));
-    let v_inv = if theta < EPSILON {
+    let v_inv = if theta < EPSILON_TAYLOR {
         Matrix3::identity() - 0.5 * omega + _1_12 * omega_2
     } else {
         let half_theta = 0.5 * theta;
@@ -75,5 +76,72 @@ pub fn log(iso: Isometry3<Float>) -> Twist {
     Twist {
         v: v_inv * iso.translation.vector,
         w: w,
+    }
+}
+
+// TESTS #############################################################
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use nalgebra::UnitQuaternion;
+
+    // The best precision I get for a round trip
+    // with exact trigonometric computations ("else" branches)
+    // is around 1e-6.
+    const EPSILON_ROUNDTRIP_APPROX: Float = 1e-1;
+
+    #[test]
+    fn exp_log_round_trip() {
+        let v = Vector3::zeros();
+        let w = Vector3::zeros();
+        let xi = Twist { v, w };
+        assert_eq!(xi, round_trip_from_algebra(xi));
+    }
+
+    #[test]
+    // Unit test with a case that doesn't go better than 1e-6 on round trip error.
+    // Even in exact computation branches (set EPSILON_TAYLOR = 1e-30 for example).
+    fn log_exp_round_trip_1() {
+        let translation = &[0.0, 0.0, 1.0];
+        let rotation = &[0.0, 2.0, 0.0];
+        let rigid_motion = gen_rigid_motion(translation, rotation);
+        assert_abs_diff_eq!(
+            rigid_motion,
+            round_trip_from_group(rigid_motion),
+            epsilon = EPSILON_ROUNDTRIP_APPROX
+        )
+    }
+
+    // PROPERTY TESTS ################################################
+
+    // quickcheck! {
+    //     fn log_exp_round_trip(t1: Float, t2: Float, t3:Float, a1: Float, a2: Float, a3: Float) -> bool {
+    //         let rigid_motion = gen_rigid_motion(&[t1,t2,t3], &[a1,a2,a3]);
+    //         abs_diff_eq!(
+    //             rigid_motion,
+    //             round_trip_from_group(rigid_motion),
+    //             epsilon = EPSILON_ROUNDTRIP_APPROX
+    //         )
+    //     }
+    // }
+
+    // GENERATORS ####################################################
+
+    fn gen_rigid_motion(translation_slice: &[Float; 3], angles: &[Float; 3]) -> Isometry3<Float> {
+        let translation = Translation3::from_vector(Vector3::from_column_slice(translation_slice));
+        let rotation = UnitQuaternion::from_euler_angles(angles[0], angles[1], angles[2]);
+        Isometry3::from_parts(translation, rotation)
+    }
+
+    // HELPERS #######################################################
+
+    fn round_trip_from_algebra(xi: Twist) -> Twist {
+        log(exp(xi))
+    }
+
+    fn round_trip_from_group(rigid_motion: Isometry3<Float>) -> Isometry3<Float> {
+        exp(log(rigid_motion))
     }
 }
