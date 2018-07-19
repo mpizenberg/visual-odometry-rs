@@ -14,6 +14,7 @@ const _1_6: Float = 1.0 / 6.0;
 const _1_12: Float = 1.0 / 12.0;
 const _1_24: Float = 1.0 / 24.0;
 const _1_120: Float = 1.0 / 120.0;
+const _1_720: Float = 1.0 / 720.0;
 
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct Twist {
@@ -54,8 +55,10 @@ pub fn exp(xi: Twist) -> Isometry3<Float> {
     let theta_2 = theta * theta;
     let (omega, omega_2) = (so3::hat(xi.w), so3::hat_2(xi.w));
     let v = if theta < EPSILON_TAYLOR {
+        println!("se3::exp theta < EPSILON_TAYLOR");
         Matrix3::identity() + (0.5 - _1_24 * theta_2) * omega + (_1_6 - _1_120 * theta_2) * omega_2
     } else {
+        println!("se3::exp else");
         Matrix3::identity() + (1.0 - theta.cos()) / theta_2 * omega
             + (theta - theta.sin()) / (theta * theta_2) * omega_2
     };
@@ -66,11 +69,13 @@ pub fn exp(xi: Twist) -> Isometry3<Float> {
 // Inverse of the exponential map.
 pub fn log(iso: Isometry3<Float>) -> Twist {
     let (w, theta) = so3::log(iso.rotation);
+    let theta_2 = theta * theta;
     let (omega, omega_2) = (so3::hat(w), so3::hat_2(w));
     let v_inv = if theta < EPSILON_TAYLOR {
-        Matrix3::identity() - 0.5 * omega + _1_12 * omega_2
+        println!("se3::log theta < EPSILON_TAYLOR");
+        Matrix3::identity() - 0.5 * omega + (_1_12 + _1_720 * theta_2) * omega_2
     } else {
-        let theta_2 = theta * theta;
+        println!("se3::log else");
         let half_theta = 0.5 * theta;
         // If θ -> PI then 1 - θ / tan(θ) -> + infinity
         // Should we have Taylor serie for when iso.rotation.scalar -> 0 ?

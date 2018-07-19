@@ -71,11 +71,13 @@ pub fn exp(w: Element) -> (UnitQuaternion<Float>, Float) {
     let real_factor;
     let imag_factor;
     if theta < EPSILON_TAYLOR {
+        println!("so3::exp theta < EPSILON_TAYLOR");
         // real_factor = 1.0 - theta_2 * (_1_8 - theta_2 * _1_384); // no need for order 4
         // imag_factor = 0.5 - theta_2 * (_1_48 - theta_2 * _1_3840); // no need for order 4
         real_factor = 1.0 - _1_8 * theta_2;
         imag_factor = 0.5 - _1_48 * theta_2;
     } else {
+        println!("so3::exp else");
         let half_theta = 0.5 * theta;
         real_factor = half_theta.cos();
         imag_factor = half_theta.sin() / theta;
@@ -106,6 +108,7 @@ pub fn log(rotation: UnitQuaternion<Float>) -> (Element, Float) {
     let tangent;
     if imag_norm < EPSILON_TAYLOR {
         // let real_factor_2 = real_factor * real_factor;
+        println!("so3::log imag_norm < EPSILON_TAYLOR");
 
         // Warning I think Sophus has forget the 1/3 coefficient.
         // I realized it when optimizing my Taylor series to work with EPSILON_TAYLOR = 1e-1.
@@ -115,6 +118,7 @@ pub fn log(rotation: UnitQuaternion<Float>) -> (Element, Float) {
         theta = atan_coef * imag_norm;
         tangent = atan_coef * imag_vector;
     } else if real_factor.abs() < EPSILON_TAYLOR {
+        println!("so3::log abs(real_factor) < EPSILON_TAYLOR");
         let alpha = real_factor.abs() / imag_norm;
         // let alpha_2 = alpha * alpha;
         theta = if real_factor >= 0.0 {
@@ -126,6 +130,7 @@ pub fn log(rotation: UnitQuaternion<Float>) -> (Element, Float) {
         };
         tangent = (theta / imag_norm) * imag_vector;
     } else {
+        println!("so3::log else");
         theta = 2.0 * (imag_norm / real_factor).atan();
         tangent = (theta / imag_norm) * imag_vector;
     }
