@@ -9,11 +9,16 @@ use so3;
 
 pub type Float = f32;
 
-const EPSILON_TAYLOR: Float = 1e-10;
+const EPSILON_TAYLOR: Float = 1e-2;
 const _1_6: Float = 1.0 / 6.0;
 const _1_12: Float = 1.0 / 12.0;
 const _1_24: Float = 1.0 / 24.0;
+const _1_40: Float = 1.0 / 40.0;
+const _1_42: Float = 1.0 / 42.0;
+const _1_60: Float = 1.0 / 60.0;
 const _1_120: Float = 1.0 / 120.0;
+const _1_180: Float = 1.0 / 180.0;
+const _1_315: Float = 1.0 / 315.0;
 const _1_720: Float = 1.0 / 720.0;
 
 #[derive(PartialEq, Debug, Copy, Clone)]
@@ -71,9 +76,24 @@ pub fn log(iso: Isometry3<Float>) -> Twist {
     let (w, theta) = so3::log(iso.rotation);
     let theta_2 = theta * theta;
     let (omega, omega_2) = (so3::hat(w), so3::hat_2(w));
-    let v_inv = if theta < EPSILON_TAYLOR {
+    let v_inv = if theta.abs() < EPSILON_TAYLOR {
         println!("se3::log theta < EPSILON_TAYLOR");
-        Matrix3::identity() - 0.5 * omega + (_1_12 + _1_720 * theta_2) * omega_2
+        // println!("omega: {}", omega);
+        // This case has a very big converging issues.
+        // Matrix3::identity() - 0.5 * omega + _1_12 * (1.0 + _1_60 * theta_2 * (1.0 + _1_42 * theta_2 * (1.0 + _1_40 * theta_2))) * omega_2
+
+        // http://www.wolframalpha.com/input/?i=1%2F(4*(atan(x)%5E2))+*+(1+-+atan(x)%2Fx)
+        let real_factor = iso.rotation.scalar();
+        let imag_norm_2 = iso.rotation.vector().norm_squared();
+        let x_2 = imag_norm_2 / (real_factor * real_factor);
+        println!("real_factor: {}", real_factor);
+        println!("imag_norm_2: {}", imag_norm_2);
+        println!("theta: {}", theta);
+        println!("x_2: {}", x_2);
+        // let coef_omega_2 = _1_12 + _1_180 * x_2 - _1_315 * x_2 * x_2;
+        let coef_omega_2 = _1_12 + _1_180 * x_2;
+        Matrix3::identity() - 0.5 * omega + coef_omega_2 * omega_2
+
     } else {
         println!("se3::log else");
         let half_theta = 0.5 * theta;
@@ -102,8 +122,8 @@ mod tests {
 
     // The best precision I get for a round trip
     // with exact trigonometric computations ("else" branches)
-    // is around 1e-6.
-    const EPSILON_ROUNDTRIP_APPROX: Float = 1e-1;
+    // is around 1e-4.
+    const EPSILON_ROUNDTRIP_APPROX: Float = 1e-4;
 
     #[test]
     fn exp_log_round_trip() {
@@ -118,7 +138,7 @@ mod tests {
         let translation = &[0.0, 0.0, 1.0];
         let rotation = &[0.0, 2.0, 0.0];
         let rigid_motion = gen_rigid_motion(translation, rotation);
-        assert_abs_diff_eq!(
+        assert_relative_eq!(
             rigid_motion,
             round_trip_from_group(rigid_motion),
             epsilon = EPSILON_ROUNDTRIP_APPROX
@@ -130,7 +150,46 @@ mod tests {
         let translation = &[0.0, 0.0, 2.0];
         let rotation = &[0.0, 4.0, 35.0];
         let rigid_motion = gen_rigid_motion(translation, rotation);
-        assert_abs_diff_eq!(
+        assert_relative_eq!(
+            rigid_motion,
+            round_trip_from_group(rigid_motion),
+            epsilon = EPSILON_ROUNDTRIP_APPROX
+        )
+    }
+
+    #[test]
+    // Fails in log branch theta < EPSILON_TAYLOR with order 2.
+    fn log_exp_round_trip_3() {
+        let translation = &[0.0, 0.0, 7.0];
+        let rotation = &[68.0, -65.69951, 0.0];
+        let rigid_motion = gen_rigid_motion(translation, rotation);
+        assert_relative_eq!(
+            rigid_motion,
+            round_trip_from_group(rigid_motion),
+            epsilon = EPSILON_ROUNDTRIP_APPROX
+        )
+    }
+
+    #[test]
+    // Fails in log branch theta < EPSILON_TAYLOR with order 4.
+    fn log_exp_round_trip_4() {
+        let translation = &[0.0, 0.0, 26.0];
+        let rotation = &[43.0, 42.76, 79.26];
+        let rigid_motion = gen_rigid_motion(translation, rotation);
+        assert_relative_eq!(
+            rigid_motion,
+            round_trip_from_group(rigid_motion),
+            epsilon = EPSILON_ROUNDTRIP_APPROX
+        )
+    }
+
+    #[test]
+    // Fails in log branch theta < EPSILON_TAYLOR with order 6.
+    fn log_exp_round_trip_5() {
+        let translation = &[0.0, 60.64, -39.24];
+        let rotation = &[-29.5, -56.0, -27.53];
+        let rigid_motion = gen_rigid_motion(translation, rotation);
+        assert_relative_eq!(
             rigid_motion,
             round_trip_from_group(rigid_motion),
             epsilon = EPSILON_ROUNDTRIP_APPROX
@@ -146,18 +205,16 @@ mod tests {
             let twist = Twist { v, w };
             twist == vee(hat(twist))
         }
-    }
 
-    // quickcheck! {
-    //     fn log_exp_round_trip(t1: Float, t2: Float, t3:Float, a1: Float, a2: Float, a3: Float) -> bool {
-    //         let rigid_motion = gen_rigid_motion(&[t1,t2,t3], &[a1,a2,a3]);
-    //         abs_diff_eq!(
-    //             rigid_motion,
-    //             round_trip_from_group(rigid_motion),
-    //             epsilon = EPSILON_ROUNDTRIP_APPROX
-    //         )
-    //     }
-    // }
+        fn log_exp_round_trip(t1: Float, t2: Float, t3:Float, a1: Float, a2: Float, a3: Float) -> bool {
+            let rigid_motion = gen_rigid_motion(&[t1,t2,t3], &[a1,a2,a3]);
+            relative_eq!(
+                rigid_motion,
+                round_trip_from_group(rigid_motion),
+                epsilon = EPSILON_ROUNDTRIP_APPROX
+            )
+        }
+    }
 
     // GENERATORS ####################################################
 

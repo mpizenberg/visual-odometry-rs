@@ -123,9 +123,11 @@ pub fn log(rotation: UnitQuaternion<Float>) -> (Element, Float) {
         // let alpha_2 = alpha * alpha;
         theta = if real_factor >= 0.0 {
             // PI - 2.0 * alpha * (1.0 - _1_3 * alpha_2 * (1.0 - _3_5 * alpha_2)) // TAYLOR = 1e-1
+            // PI - 2.0 * alpha * (1.0 - _1_3 * alpha_2) // TAYLOR = 1e-2 and also ok for SE3
             PI - 2.0 * alpha // TAYLOR = 1e-2
         } else {
             // -PI + 2.0 * alpha * (1.0 - _1_3 * alpha_2 * (1.0 - _3_5 * alpha_2)) // TAYLOR = 1e-1
+            // -PI + 2.0 * alpha * (1.0 - _1_3 * alpha_2) // TAYLOR = 1e-2 and also ok for SE3
             -PI + 2.0 * alpha // TAYLOR = 1e-2
         };
         tangent = (theta / imag_norm) * imag_vector;
@@ -160,7 +162,7 @@ mod tests {
     // Even in exact computation branches (set EPSILON_TAYLOR = 1e-30 for example).
     fn log_exp_round_trip_1() {
         let rotation = UnitQuaternion::from_euler_angles(52.472717, 63.55043, -70.95492);
-        assert_abs_diff_eq!(
+        assert_relative_eq!(
             rotation,
             round_trip_from_group(rotation),
             epsilon = EPSILON_ROUNDTRIP_APPROX
@@ -171,7 +173,7 @@ mod tests {
     // Unit test to try to use taylor approx with < 0.1
     fn log_exp_round_trip_2() {
         let rotation = UnitQuaternion::from_euler_angles(7.955124, 38.33348, 22.914268);
-        assert_abs_diff_eq!(
+        assert_relative_eq!(
             rotation,
             round_trip_from_group(rotation),
             epsilon = EPSILON_ROUNDTRIP_APPROX
@@ -182,7 +184,7 @@ mod tests {
     // Unit test to try to use taylor approx with < 0.1
     fn log_exp_round_trip_3() {
         let rotation = UnitQuaternion::from_euler_angles(-23.796371, -17.82396, -52.80335);
-        assert_abs_diff_eq!(
+        assert_relative_eq!(
             rotation,
             round_trip_from_group(rotation),
             epsilon = EPSILON_ROUNDTRIP_APPROX
@@ -193,7 +195,7 @@ mod tests {
     // Unit test to try to use taylor approx with < 0.1
     fn log_exp_round_trip_4() {
         let rotation = UnitQuaternion::from_euler_angles(0.0, -81.6, 0.0);
-        assert_abs_diff_eq!(
+        assert_relative_eq!(
             rotation,
             round_trip_from_group(rotation),
             epsilon = EPSILON_ROUNDTRIP_APPROX
@@ -205,26 +207,22 @@ mod tests {
     quickcheck! {
         fn log_exp_round_trip(roll: Float, pitch: Float, yaw: Float) -> bool {
             let rotation = gen_rotation(roll, pitch, yaw);
-            abs_diff_eq!(
+            relative_eq!(
                 rotation,
                 round_trip_from_group(rotation),
                 epsilon = EPSILON_ROUNDTRIP_APPROX
             )
         }
-    }
 
-    quickcheck! {
         fn hat_2_ok(x: Float, y: Float, z: Float) -> bool {
             let element = Vector3::new(x,y,z);
-            abs_diff_eq!(
+            relative_eq!(
                 hat_2(element),
                 hat(element) * hat(element),
                 epsilon = EPSILON_ROUNDTRIP_APPROX
             )
         }
-    }
 
-    quickcheck! {
         fn hat_vee_roundtrip(x: Float, y: Float, z: Float) -> bool {
             let element = Vector3::new(x,y,z);
             element == vee(hat(element))
