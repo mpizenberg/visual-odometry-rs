@@ -70,8 +70,9 @@ pub fn log(iso: Isometry3<Float>) -> Twist {
     let v_inv = if theta < EPSILON_TAYLOR {
         Matrix3::identity() - 0.5 * omega + _1_12 * omega_2
     } else {
+        let theta_2 = theta * theta;
         let half_theta = 0.5 * theta;
-        Matrix3::identity() - 0.5 * omega + (1.0 - half_theta / half_theta.tan()) * omega_2
+        Matrix3::identity() - 0.5 * omega + (1.0 - half_theta / half_theta.tan()) / theta_2 * omega_2
     };
     Twist {
         v: v_inv * iso.translation.vector,
@@ -100,19 +101,19 @@ mod tests {
         assert_eq!(xi, round_trip_from_algebra(xi));
     }
 
-    // #[test]
-    // // Unit test with a case that doesn't go better than 1e-6 on round trip error.
-    // // Even in exact computation branches (set EPSILON_TAYLOR = 1e-30 for example).
-    // fn log_exp_round_trip_1() {
-    //     let translation = &[0.0, 0.0, 1.0];
-    //     let rotation = &[0.0, 2.0, 0.0];
-    //     let rigid_motion = gen_rigid_motion(translation, rotation);
-    //     assert_abs_diff_eq!(
-    //         rigid_motion,
-    //         round_trip_from_group(rigid_motion),
-    //         epsilon = EPSILON_ROUNDTRIP_APPROX
-    //     )
-    // }
+    #[test]
+    // Unit test with a case that doesn't go better than 1e-6 on round trip error.
+    // Even in exact computation branches (set EPSILON_TAYLOR = 1e-30 for example).
+    fn log_exp_round_trip_1() {
+        let translation = &[0.0, 0.0, 1.0];
+        let rotation = &[0.0, 2.0, 0.0];
+        let rigid_motion = gen_rigid_motion(translation, rotation);
+        assert_abs_diff_eq!(
+            rigid_motion,
+            round_trip_from_group(rigid_motion),
+            epsilon = EPSILON_ROUNDTRIP_APPROX
+        )
+    }
 
     // PROPERTY TESTS ################################################
 
