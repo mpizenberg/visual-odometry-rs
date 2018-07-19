@@ -9,7 +9,7 @@ use so3;
 
 pub type Float = f32;
 
-const EPSILON_TAYLOR: Float = 1e-2;
+const EPSILON_TAYLOR: Float = 1e-10;
 const _1_6: Float = 1.0 / 6.0;
 const _1_12: Float = 1.0 / 12.0;
 const _1_24: Float = 1.0 / 24.0;
@@ -72,7 +72,14 @@ pub fn log(iso: Isometry3<Float>) -> Twist {
     } else {
         let theta_2 = theta * theta;
         let half_theta = 0.5 * theta;
-        Matrix3::identity() - 0.5 * omega + (1.0 - half_theta / half_theta.tan()) / theta_2 * omega_2
+        // If θ -> PI then 1 - θ / tan(θ) -> + infinity
+        // Should we have Taylor serie for when iso.rotation.scalar -> 0 ?
+        // Also, it seems stupid to do tan(θ/2) while in so3::log we do θ = 2 * atan(...).
+        // Matrix3::identity() - 0.5 * omega + (1.0 - half_theta / half_theta.tan()) / theta_2 * omega_2
+        let real_factor = iso.rotation.scalar();
+        let imag_norm = iso.rotation.vector().norm_squared().sqrt();
+        // Version where tan(atan(..)) has been simplified.
+        Matrix3::identity() - 0.5 * omega + (1.0 - half_theta * real_factor / imag_norm) / theta_2 * omega_2
     };
     Twist {
         v: v_inv * iso.translation.vector,
@@ -102,11 +109,21 @@ mod tests {
     }
 
     #[test]
-    // Unit test with a case that doesn't go better than 1e-6 on round trip error.
-    // Even in exact computation branches (set EPSILON_TAYLOR = 1e-30 for example).
     fn log_exp_round_trip_1() {
         let translation = &[0.0, 0.0, 1.0];
         let rotation = &[0.0, 2.0, 0.0];
+        let rigid_motion = gen_rigid_motion(translation, rotation);
+        assert_abs_diff_eq!(
+            rigid_motion,
+            round_trip_from_group(rigid_motion),
+            epsilon = EPSILON_ROUNDTRIP_APPROX
+        )
+    }
+
+    #[test]
+    fn log_exp_round_trip_2() {
+        let translation = &[0.0, 0.0, 2.0];
+        let rotation = &[0.0, 4.0, 35.0];
         let rigid_motion = gen_rigid_motion(translation, rotation);
         assert_abs_diff_eq!(
             rigid_motion,
