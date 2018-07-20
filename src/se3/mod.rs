@@ -87,29 +87,23 @@ pub fn log(iso: Isometry3<Float>) -> Twist {
     let w;
     let v_inv;
     if imag_norm < EPSILON_TAYLOR_SERIES {
-        let atan_coef_by_imag_norm = 2.0 / real_factor; // TAYLOR
-        w = atan_coef_by_imag_norm * imag_vector;
+        let theta_by_imag_norm = 2.0 / real_factor; // TAYLOR
+        w = theta_by_imag_norm * imag_vector;
         let (omega, omega_2) = (so3::hat(w), so3::hat_2(w));
         let x_2 = imag_norm_2 / (real_factor * real_factor);
         let coef_omega_2 = _1_12 * (1.0 + _1_15 * x_2); // TAYLOR
         v_inv = Matrix3::identity() - 0.5 * omega + coef_omega_2 * omega_2;
-    } else if real_factor.abs() < EPSILON_TAYLOR_SERIES {
-        let alpha = real_factor.abs() / imag_norm;
-        let theta = real_factor.signum() * (PI - 2.0 * alpha); // TAYLOR
-        let theta_2 = theta * theta;
-        let half_theta = 0.5 * theta;
-        w = (theta / imag_norm) * imag_vector;
-        let (omega, omega_2) = (so3::hat(w), so3::hat_2(w));
-        // TODO improve here by using Taylor series.
-        let coef_omega_2 = (1.0 - half_theta * real_factor / imag_norm) / theta_2;
-        v_inv = Matrix3::identity() - 0.5 * omega + coef_omega_2 * omega_2;
     } else {
-        let theta = 2.0 * (imag_norm / real_factor).atan();
+        let theta = if real_factor.abs() < EPSILON_TAYLOR_SERIES {
+            let alpha = real_factor.abs() / imag_norm;
+            real_factor.signum() * (PI - 2.0 * alpha) // TAYLOR
+        } else {
+            2.0 * (imag_norm / real_factor).atan()
+        };
         let theta_2 = theta * theta;
-        let half_theta = 0.5 * theta;
         w = (theta / imag_norm) * imag_vector;
         let (omega, omega_2) = (so3::hat(w), so3::hat_2(w));
-        let coef_omega_2 = (1.0 - half_theta * real_factor / imag_norm) / theta_2;
+        let coef_omega_2 = (1.0 - 0.5 * theta * real_factor / imag_norm) / theta_2;
         v_inv = Matrix3::identity() - 0.5 * omega + coef_omega_2 * omega_2;
     };
     Twist {
