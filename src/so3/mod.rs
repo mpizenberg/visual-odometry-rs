@@ -58,8 +58,7 @@ pub fn vee(mat: Matrix3<Float>) -> Element {
 
 // Compute the exponential map from Lie algebra so3 to Lie group SO3.
 // Goes from so3 parameterization to SO3 element (rotation).
-// Also returns the norm of the Lie algebra element.
-pub fn exp(w: Element) -> (UnitQuaternion<Float>, Float) {
+pub fn exp(w: Element) -> UnitQuaternion<Float> {
     let theta_2 = w.norm_squared();
     let theta = theta_2.sqrt();
     let real_factor;
@@ -72,34 +71,30 @@ pub fn exp(w: Element) -> (UnitQuaternion<Float>, Float) {
         real_factor = half_theta.cos();
         imag_factor = half_theta.sin() / theta;
     }
-    let rotation =
-        UnitQuaternion::from_quaternion(Quaternion::from_parts(real_factor, imag_factor * w));
-    (rotation, theta)
+    UnitQuaternion::from_quaternion(Quaternion::from_parts(real_factor, imag_factor * w))
 }
 
 // Compute the logarithm map from the Lie group SO3 to the Lie algebra so3.
 // Inverse of the exponential map.
-// Also returns the norm of the Lie algebra element.
-pub fn log(rotation: UnitQuaternion<Float>) -> (Element, Float) {
+pub fn log(rotation: UnitQuaternion<Float>) -> Element {
     let imag_vector = rotation.vector();
     let imag_norm_2 = imag_vector.norm_squared();
     let imag_norm = imag_norm_2.sqrt();
     let real_factor = rotation.scalar();
     let theta;
-    let tangent;
+    let w;
     if imag_norm < EPSILON_TAYLOR_SERIES {
         let atan_coef_by_imag_norm = 2.0 / real_factor; // TAYLOR
-        theta = atan_coef_by_imag_norm * imag_norm;
-        tangent = atan_coef_by_imag_norm * imag_vector;
+        w = atan_coef_by_imag_norm * imag_vector;
     } else if real_factor.abs() < EPSILON_TAYLOR_SERIES {
         let alpha = real_factor.abs() / imag_norm;
         theta = real_factor.signum() * (PI - 2.0 * alpha); // TAYLOR
-        tangent = (theta / imag_norm) * imag_vector;
+        w = (theta / imag_norm) * imag_vector;
     } else {
         theta = 2.0 * (imag_norm / real_factor).atan();
-        tangent = (theta / imag_norm) * imag_vector;
+        w = (theta / imag_norm) * imag_vector;
     }
-    (tangent, theta)
+    w
 }
 
 // TESTS #############################################################
@@ -116,7 +111,7 @@ mod tests {
     #[test]
     fn exp_log_round_trip() {
         let w = Vector3::zeros();
-        assert_eq!(w, round_trip_from_algebra(w));
+        assert_eq!(w, log(exp(w)));
     }
 
     // PROPERTY TESTS ################################################
@@ -136,7 +131,7 @@ mod tests {
             let rotation = gen_rotation(roll, pitch, yaw);
             relative_eq!(
                 rotation,
-                round_trip_from_group(rotation),
+                exp(log(rotation)),
                 epsilon = EPSILON_ROUNDTRIP_APPROX
             )
         }
@@ -146,19 +141,5 @@ mod tests {
 
     fn gen_rotation(roll: Float, pitch: Float, yaw: Float) -> UnitQuaternion<Float> {
         UnitQuaternion::from_euler_angles(roll, pitch, yaw)
-    }
-
-    // HELPERS #######################################################
-
-    fn round_trip_from_algebra(w: Element) -> Element {
-        let (rotation, _) = exp(w);
-        let (new_w, _) = log(rotation);
-        new_w
-    }
-
-    fn round_trip_from_group(rotation: UnitQuaternion<Float>) -> UnitQuaternion<Float> {
-        let (w, _) = log(rotation);
-        let (new_rotation, _) = exp(w);
-        new_rotation
     }
 }
