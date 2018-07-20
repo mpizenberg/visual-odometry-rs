@@ -88,7 +88,6 @@ pub fn log(iso: Isometry3<Float>) -> Twist {
     let v_inv;
     if imag_norm < EPSILON_TAYLOR_SERIES {
         let atan_coef_by_imag_norm = 2.0 / real_factor; // TAYLOR
-        let theta = atan_coef_by_imag_norm * imag_norm;
         w = atan_coef_by_imag_norm * imag_vector;
         let (omega, omega_2) = (so3::hat(w), so3::hat_2(w));
         let x_2 = imag_norm_2 / (real_factor * real_factor);
