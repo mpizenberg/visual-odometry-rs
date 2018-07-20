@@ -10,6 +10,7 @@ use std::f32::consts::PI;
 pub type Float = f32;
 
 const EPSILON_TAYLOR_SERIES: Float = 1e-2;
+const EPSILON_TAYLOR_SERIES_2: Float = EPSILON_TAYLOR_SERIES * EPSILON_TAYLOR_SERIES;
 const _1_8: Float = 0.125;
 const _1_48: Float = 1.0 / 48.0;
 
@@ -60,13 +61,13 @@ pub fn vee(mat: Matrix3<Float>) -> Element {
 // Goes from so3 parameterization to SO3 element (rotation).
 pub fn exp(w: Element) -> UnitQuaternion<Float> {
     let theta_2 = w.norm_squared();
-    let theta = theta_2.sqrt();
     let real_factor;
     let imag_factor;
-    if theta < EPSILON_TAYLOR_SERIES {
+    if theta_2 < EPSILON_TAYLOR_SERIES_2 {
         real_factor = 1.0 - _1_8 * theta_2;
         imag_factor = 0.5 - _1_48 * theta_2;
     } else {
+        let theta = theta_2.sqrt();
         let half_theta = 0.5 * theta;
         real_factor = half_theta.cos();
         imag_factor = half_theta.sin() / theta;
@@ -79,22 +80,20 @@ pub fn exp(w: Element) -> UnitQuaternion<Float> {
 pub fn log(rotation: UnitQuaternion<Float>) -> Element {
     let imag_vector = rotation.vector();
     let imag_norm_2 = imag_vector.norm_squared();
-    let imag_norm = imag_norm_2.sqrt();
     let real_factor = rotation.scalar();
-    let theta;
-    let w;
-    if imag_norm < EPSILON_TAYLOR_SERIES {
-        let atan_coef_by_imag_norm = 2.0 / real_factor; // TAYLOR
-        w = atan_coef_by_imag_norm * imag_vector;
+    if imag_norm_2 < EPSILON_TAYLOR_SERIES_2 {
+        let theta_by_imag_norm = 2.0 / real_factor; // TAYLOR
+        theta_by_imag_norm * imag_vector
     } else if real_factor.abs() < EPSILON_TAYLOR_SERIES {
+        let imag_norm = imag_norm_2.sqrt();
         let alpha = real_factor.abs() / imag_norm;
-        theta = real_factor.signum() * (PI - 2.0 * alpha); // TAYLOR
-        w = (theta / imag_norm) * imag_vector;
+        let theta = real_factor.signum() * (PI - 2.0 * alpha); // TAYLOR
+        (theta / imag_norm) * imag_vector
     } else {
-        theta = 2.0 * (imag_norm / real_factor).atan();
-        w = (theta / imag_norm) * imag_vector;
+        let imag_norm = imag_norm_2.sqrt();
+        let theta = 2.0 * (imag_norm / real_factor).atan();
+        (theta / imag_norm) * imag_vector
     }
-    w
 }
 
 // TESTS #############################################################

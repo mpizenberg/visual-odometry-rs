@@ -54,27 +54,27 @@ pub fn vee(mat: Matrix4<Float>) -> Twist {
 pub fn exp(xi: Twist) -> Isometry3<Float> {
     let theta_2 = xi.w.norm_squared();
     let (omega, omega_2) = (so3::hat(xi.w), so3::hat_2(xi.w));
-    let real_factor;
-    let imag_factor;
-    let v;
     if theta_2 < EPSILON_TAYLOR_SERIES_2 {
-        real_factor = 1.0 - _1_8 * theta_2; // TAYLOR
-        imag_factor = 0.5 - _1_48 * theta_2; // TAYLOR
+        let real_factor = 1.0 - _1_8 * theta_2; // TAYLOR
+        let imag_factor = 0.5 - _1_48 * theta_2; // TAYLOR
         let coef_omega = 0.5 - _1_24 * theta_2; // TAYLOR
         let coef_omega_2 = _1_6 - _1_120 * theta_2; // TAYLOR
-        v = Matrix3::identity() + coef_omega * omega + coef_omega_2 * omega_2;
+        let v = Matrix3::identity() + coef_omega * omega + coef_omega_2 * omega_2;
+        let rotation =
+            UnitQuaternion::from_quaternion(Quaternion::from_parts(real_factor, imag_factor * xi.w));
+        Isometry3::from_parts(Translation3::from_vector(v * xi.v), rotation)
     } else {
         let theta = theta_2.sqrt();
         let half_theta = 0.5 * theta;
-        real_factor = half_theta.cos();
-        imag_factor = half_theta.sin() / theta;
+        let real_factor = half_theta.cos();
+        let imag_factor = half_theta.sin() / theta;
         let coef_omega = (1.0 - theta.cos()) / theta_2;
         let coef_omega_2 = (theta - theta.sin()) / (theta * theta_2);
-        v = Matrix3::identity() + coef_omega * omega + coef_omega_2 * omega_2
-    };
-    let rotation =
-        UnitQuaternion::from_quaternion(Quaternion::from_parts(real_factor, imag_factor * xi.w));
-    Isometry3::from_parts(Translation3::from_vector(v * xi.v), rotation)
+        let v = Matrix3::identity() + coef_omega * omega + coef_omega_2 * omega_2;
+        let rotation =
+            UnitQuaternion::from_quaternion(Quaternion::from_parts(real_factor, imag_factor * xi.w));
+        Isometry3::from_parts(Translation3::from_vector(v * xi.v), rotation)
+    }
 }
 
 // Compute the logarithm map from the Lie group SE3 to the Lie algebra se3.
@@ -82,18 +82,17 @@ pub fn exp(xi: Twist) -> Isometry3<Float> {
 pub fn log(iso: Isometry3<Float>) -> Twist {
     let imag_vector = iso.rotation.vector();
     let imag_norm_2 = imag_vector.norm_squared();
-    let imag_norm = imag_norm_2.sqrt();
     let real_factor = iso.rotation.scalar();
-    let w;
-    let v_inv;
-    if imag_norm < EPSILON_TAYLOR_SERIES {
+    if imag_norm_2 < EPSILON_TAYLOR_SERIES_2 {
         let theta_by_imag_norm = 2.0 / real_factor; // TAYLOR
-        w = theta_by_imag_norm * imag_vector;
+        let w = theta_by_imag_norm * imag_vector;
         let (omega, omega_2) = (so3::hat(w), so3::hat_2(w));
         let x_2 = imag_norm_2 / (real_factor * real_factor);
         let coef_omega_2 = _1_12 * (1.0 + _1_15 * x_2); // TAYLOR
-        v_inv = Matrix3::identity() - 0.5 * omega + coef_omega_2 * omega_2;
+        let v_inv = Matrix3::identity() - 0.5 * omega + coef_omega_2 * omega_2;
+        Twist { v: v_inv * iso.translation.vector, w: w }
     } else {
+        let imag_norm = imag_norm_2.sqrt();
         let theta = if real_factor.abs() < EPSILON_TAYLOR_SERIES {
             let alpha = real_factor.abs() / imag_norm;
             real_factor.signum() * (PI - 2.0 * alpha) // TAYLOR
@@ -101,14 +100,11 @@ pub fn log(iso: Isometry3<Float>) -> Twist {
             2.0 * (imag_norm / real_factor).atan()
         };
         let theta_2 = theta * theta;
-        w = (theta / imag_norm) * imag_vector;
+        let w = (theta / imag_norm) * imag_vector;
         let (omega, omega_2) = (so3::hat(w), so3::hat_2(w));
         let coef_omega_2 = (1.0 - 0.5 * theta * real_factor / imag_norm) / theta_2;
-        v_inv = Matrix3::identity() - 0.5 * omega + coef_omega_2 * omega_2;
-    };
-    Twist {
-        v: v_inv * iso.translation.vector,
-        w: w,
+        let v_inv = Matrix3::identity() - 0.5 * omega + coef_omega_2 * omega_2;
+        Twist { v: v_inv * iso.translation.vector, w: w }
     }
 }
 
