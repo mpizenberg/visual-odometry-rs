@@ -9,17 +9,12 @@ use so3;
 
 pub type Float = f32;
 
-const EPSILON_TAYLOR: Float = 1e-2;
+const EPSILON_TAYLOR_SERIES: Float = 1e-2;
 const _1_6: Float = 1.0 / 6.0;
 const _1_12: Float = 1.0 / 12.0;
+const _1_15: Float = 1.0 / 15.0;
 const _1_24: Float = 1.0 / 24.0;
-const _1_40: Float = 1.0 / 40.0;
-const _1_42: Float = 1.0 / 42.0;
-const _1_60: Float = 1.0 / 60.0;
 const _1_120: Float = 1.0 / 120.0;
-const _1_180: Float = 1.0 / 180.0;
-const _1_315: Float = 1.0 / 315.0;
-const _1_720: Float = 1.0 / 720.0;
 
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct Twist {
@@ -27,8 +22,7 @@ pub struct Twist {
     w: so3::Element,
 }
 
-// Hat operator.
-// Goes from se3 parameters to se3 element (4x4 matrix).
+// Hat operator. Goes from se3 parameters to se3 element (4x4 matrix).
 pub fn hat(xi: Twist) -> Matrix4<Float> {
     let w1 = xi.w[0];
     let w2 = xi.w[1];
@@ -41,10 +35,8 @@ pub fn hat(xi: Twist) -> Matrix4<Float> {
     ])
 }
 
-// Vee operator.
-// Inverse of hat operator.
-// Warning! does not check that the given
-// top left 3x3 sub-matrix is skew-symmetric.
+// Vee operator. Inverse of hat operator.
+// Warning! does not check that the given top left 3x3 sub-matrix is skew-symmetric.
 pub fn vee(mat: Matrix4<Float>) -> Twist {
     // TODO: improve performance.
     Twist {
@@ -59,11 +51,9 @@ pub fn exp(xi: Twist) -> Isometry3<Float> {
     let (rotation, theta) = so3::exp(xi.w);
     let theta_2 = theta * theta;
     let (omega, omega_2) = (so3::hat(xi.w), so3::hat_2(xi.w));
-    let v = if theta < EPSILON_TAYLOR {
-        println!("se3::exp theta < EPSILON_TAYLOR");
+    let v = if theta < EPSILON_TAYLOR_SERIES {
         Matrix3::identity() + (0.5 - _1_24 * theta_2) * omega + (_1_6 - _1_120 * theta_2) * omega_2
     } else {
-        println!("se3::exp else");
         Matrix3::identity() + (1.0 - theta.cos()) / theta_2 * omega
             + (theta - theta.sin()) / (theta * theta_2) * omega_2
     };
@@ -76,35 +66,21 @@ pub fn log(iso: Isometry3<Float>) -> Twist {
     let (w, theta) = so3::log(iso.rotation);
     let theta_2 = theta * theta;
     let (omega, omega_2) = (so3::hat(w), so3::hat_2(w));
-    let v_inv = if theta.abs() < EPSILON_TAYLOR {
-        println!("se3::log theta < EPSILON_TAYLOR");
-        // println!("omega: {}", omega);
-        // This case has a very big converging issues.
-        // Matrix3::identity() - 0.5 * omega + _1_12 * (1.0 + _1_60 * theta_2 * (1.0 + _1_42 * theta_2 * (1.0 + _1_40 * theta_2))) * omega_2
-
-        // http://www.wolframalpha.com/input/?i=1%2F(4*(atan(x)%5E2))+*+(1+-+atan(x)%2Fx)
+    let v_inv = if theta.abs() < EPSILON_TAYLOR_SERIES {
         let real_factor = iso.rotation.scalar();
         let imag_norm_2 = iso.rotation.vector().norm_squared();
         let x_2 = imag_norm_2 / (real_factor * real_factor);
-        println!("real_factor: {}", real_factor);
-        println!("imag_norm_2: {}", imag_norm_2);
-        println!("theta: {}", theta);
-        println!("x_2: {}", x_2);
-        // let coef_omega_2 = _1_12 + _1_180 * x_2 - _1_315 * x_2 * x_2;
-        let coef_omega_2 = _1_12 + _1_180 * x_2;
+        // Taylor series from:
+        // http://www.wolframalpha.com/input/?i=1%2F(4*(atan(x)%5E2))+*+(1+-+atan(x)%2Fx)
+        let coef_omega_2 = _1_12 * (1.0 + _1_15 * x_2);
         Matrix3::identity() - 0.5 * omega + coef_omega_2 * omega_2
 
     } else {
-        println!("se3::log else");
         let half_theta = 0.5 * theta;
-        // If θ -> PI then 1 - θ / tan(θ) -> + infinity
-        // Should we have Taylor serie for when iso.rotation.scalar -> 0 ?
-        // Also, it seems stupid to do tan(θ/2) while in so3::log we do θ = 2 * atan(...).
-        // Matrix3::identity() - 0.5 * omega + (1.0 - half_theta / half_theta.tan()) / theta_2 * omega_2
         let real_factor = iso.rotation.scalar();
         let imag_norm = iso.rotation.vector().norm_squared().sqrt();
-        // Version where tan(atan(..)) has been simplified.
-        Matrix3::identity() - 0.5 * omega + (1.0 - half_theta * real_factor / imag_norm) / theta_2 * omega_2
+        let coef_omega_2 = (1.0 - half_theta * real_factor / imag_norm) / theta_2;
+        Matrix3::identity() - 0.5 * omega + coef_omega_2 * omega_2
     };
     Twist {
         v: v_inv * iso.translation.vector,
@@ -120,9 +96,8 @@ mod tests {
     use super::*;
     use nalgebra::UnitQuaternion;
 
-    // The best precision I get for a round trip
-    // with exact trigonometric computations ("else" branches)
-    // is around 1e-4.
+    // The best precision I get for round trips with quickcheck random inputs
+    // with exact trigonometric computations ("else" branches) is around 1e-4.
     const EPSILON_ROUNDTRIP_APPROX: Float = 1e-4;
 
     #[test]
@@ -130,70 +105,7 @@ mod tests {
         let v = Vector3::zeros();
         let w = Vector3::zeros();
         let xi = Twist { v, w };
-        assert_eq!(xi, round_trip_from_algebra(xi));
-    }
-
-    #[test]
-    fn log_exp_round_trip_1() {
-        let translation = &[0.0, 0.0, 1.0];
-        let rotation = &[0.0, 2.0, 0.0];
-        let rigid_motion = gen_rigid_motion(translation, rotation);
-        assert_relative_eq!(
-            rigid_motion,
-            round_trip_from_group(rigid_motion),
-            epsilon = EPSILON_ROUNDTRIP_APPROX
-        )
-    }
-
-    #[test]
-    fn log_exp_round_trip_2() {
-        let translation = &[0.0, 0.0, 2.0];
-        let rotation = &[0.0, 4.0, 35.0];
-        let rigid_motion = gen_rigid_motion(translation, rotation);
-        assert_relative_eq!(
-            rigid_motion,
-            round_trip_from_group(rigid_motion),
-            epsilon = EPSILON_ROUNDTRIP_APPROX
-        )
-    }
-
-    #[test]
-    // Fails in log branch theta < EPSILON_TAYLOR with order 2.
-    fn log_exp_round_trip_3() {
-        let translation = &[0.0, 0.0, 7.0];
-        let rotation = &[68.0, -65.69951, 0.0];
-        let rigid_motion = gen_rigid_motion(translation, rotation);
-        assert_relative_eq!(
-            rigid_motion,
-            round_trip_from_group(rigid_motion),
-            epsilon = EPSILON_ROUNDTRIP_APPROX
-        )
-    }
-
-    #[test]
-    // Fails in log branch theta < EPSILON_TAYLOR with order 4.
-    fn log_exp_round_trip_4() {
-        let translation = &[0.0, 0.0, 26.0];
-        let rotation = &[43.0, 42.76, 79.26];
-        let rigid_motion = gen_rigid_motion(translation, rotation);
-        assert_relative_eq!(
-            rigid_motion,
-            round_trip_from_group(rigid_motion),
-            epsilon = EPSILON_ROUNDTRIP_APPROX
-        )
-    }
-
-    #[test]
-    // Fails in log branch theta < EPSILON_TAYLOR with order 6.
-    fn log_exp_round_trip_5() {
-        let translation = &[0.0, 60.64, -39.24];
-        let rotation = &[-29.5, -56.0, -27.53];
-        let rigid_motion = gen_rigid_motion(translation, rotation);
-        assert_relative_eq!(
-            rigid_motion,
-            round_trip_from_group(rigid_motion),
-            epsilon = EPSILON_ROUNDTRIP_APPROX
-        )
+        assert_eq!(xi, log(exp(xi)));
     }
 
     // PROPERTY TESTS ################################################
@@ -210,7 +122,7 @@ mod tests {
             let rigid_motion = gen_rigid_motion(&[t1,t2,t3], &[a1,a2,a3]);
             relative_eq!(
                 rigid_motion,
-                round_trip_from_group(rigid_motion),
+                exp(log(rigid_motion)),
                 epsilon = EPSILON_ROUNDTRIP_APPROX
             )
         }
@@ -222,15 +134,5 @@ mod tests {
         let translation = Translation3::from_vector(Vector3::from_column_slice(translation_slice));
         let rotation = UnitQuaternion::from_euler_angles(angles[0], angles[1], angles[2]);
         Isometry3::from_parts(translation, rotation)
-    }
-
-    // HELPERS #######################################################
-
-    fn round_trip_from_algebra(xi: Twist) -> Twist {
-        log(exp(xi))
-    }
-
-    fn round_trip_from_group(rigid_motion: Isometry3<Float>) -> Isometry3<Float> {
-        exp(log(rigid_motion))
     }
 }

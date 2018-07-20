@@ -9,14 +9,9 @@ use std::f32::consts::PI;
 
 pub type Float = f32;
 
-// const EPSILON_TAYLOR: Float = 1e-1;
-const EPSILON_TAYLOR: Float = 1e-2;
+const EPSILON_TAYLOR_SERIES: Float = 1e-2;
 const _1_8: Float = 0.125;
-const _1_3: Float = 1.0 / 3.0;
-const _3_5: Float = 3.0 / 5.0;
 const _1_48: Float = 1.0 / 48.0;
-const _1_384: Float = 1.0 / 384.0;
-const _1_3840: Float = 1.0 / 3840.0;
 
 pub type Element = Vector3<Float>;
 
@@ -54,8 +49,7 @@ pub fn hat_2(w: Element) -> Matrix3<Float> {
     ])
 }
 
-// Vee operator.
-// Inverse of hat operator.
+// Vee operator. Inverse of hat operator.
 // Warning! does not check that the given matrix is skew-symmetric.
 pub fn vee(mat: Matrix3<Float>) -> Element {
     // TODO: improve performance.
@@ -63,21 +57,17 @@ pub fn vee(mat: Matrix3<Float>) -> Element {
 }
 
 // Compute the exponential map from Lie algebra so3 to Lie group SO3.
-// Goes from so3 parameterization to SO3 element (rotation matrix).
+// Goes from so3 parameterization to SO3 element (rotation).
 // Also returns the norm of the Lie algebra element.
 pub fn exp(w: Element) -> (UnitQuaternion<Float>, Float) {
     let theta_2 = w.norm_squared();
     let theta = theta_2.sqrt();
     let real_factor;
     let imag_factor;
-    if theta < EPSILON_TAYLOR {
-        println!("so3::exp theta < EPSILON_TAYLOR");
-        // real_factor = 1.0 - theta_2 * (_1_8 - theta_2 * _1_384); // no need for order 4
-        // imag_factor = 0.5 - theta_2 * (_1_48 - theta_2 * _1_3840); // no need for order 4
+    if theta < EPSILON_TAYLOR_SERIES {
         real_factor = 1.0 - _1_8 * theta_2;
         imag_factor = 0.5 - _1_48 * theta_2;
     } else {
-        println!("so3::exp else");
         let half_theta = 0.5 * theta;
         real_factor = half_theta.cos();
         imag_factor = half_theta.sin() / theta;
@@ -90,15 +80,6 @@ pub fn exp(w: Element) -> (UnitQuaternion<Float>, Float) {
 // Compute the logarithm map from the Lie group SO3 to the Lie algebra so3.
 // Inverse of the exponential map.
 // Also returns the norm of the Lie algebra element.
-//
-// Computation taken from the Sophus library.
-//
-// Atan-based log thanks to:
-//
-// C. Hertzberg et al.
-// "Integrating Generic Sensor Fusion Algorithms with Sound State
-// Representation through Encapsulation of Manifolds"
-// Information Fusion, 2011
 pub fn log(rotation: UnitQuaternion<Float>) -> (Element, Float) {
     let imag_vector = rotation.vector();
     let imag_norm_2 = imag_vector.norm_squared();
@@ -106,33 +87,15 @@ pub fn log(rotation: UnitQuaternion<Float>) -> (Element, Float) {
     let real_factor = rotation.scalar();
     let theta;
     let tangent;
-    if imag_norm < EPSILON_TAYLOR {
-        // let real_factor_2 = real_factor * real_factor;
-        println!("so3::log imag_norm < EPSILON_TAYLOR");
-
-        // Warning I think Sophus has forget the 1/3 coefficient.
-        // I realized it when optimizing my Taylor series to work with EPSILON_TAYLOR = 1e-1.
-        // Adding the _1_3 coef fix the test log_exp_round_trip_4.
-        // let atan_coef = 2.0 * (1.0 - _1_3 * imag_norm_2 / real_factor_2) / real_factor; // TAYLOR = 1e-1
-        let atan_coef = 2.0 / real_factor; // TAYLOR = 1e-2
-        theta = atan_coef * imag_norm;
-        tangent = atan_coef * imag_vector;
-    } else if real_factor.abs() < EPSILON_TAYLOR {
-        println!("so3::log abs(real_factor) < EPSILON_TAYLOR");
+    if imag_norm < EPSILON_TAYLOR_SERIES {
+        let atan_coef_by_imag_norm = 2.0 / real_factor; // TAYLOR
+        theta = atan_coef_by_imag_norm * imag_norm;
+        tangent = atan_coef_by_imag_norm * imag_vector;
+    } else if real_factor.abs() < EPSILON_TAYLOR_SERIES {
         let alpha = real_factor.abs() / imag_norm;
-        // let alpha_2 = alpha * alpha;
-        theta = if real_factor >= 0.0 {
-            // PI - 2.0 * alpha * (1.0 - _1_3 * alpha_2 * (1.0 - _3_5 * alpha_2)) // TAYLOR = 1e-1
-            // PI - 2.0 * alpha * (1.0 - _1_3 * alpha_2) // TAYLOR = 1e-2 and also ok for SE3
-            PI - 2.0 * alpha // TAYLOR = 1e-2
-        } else {
-            // -PI + 2.0 * alpha * (1.0 - _1_3 * alpha_2 * (1.0 - _3_5 * alpha_2)) // TAYLOR = 1e-1
-            // -PI + 2.0 * alpha * (1.0 - _1_3 * alpha_2) // TAYLOR = 1e-2 and also ok for SE3
-            -PI + 2.0 * alpha // TAYLOR = 1e-2
-        };
+        theta = real_factor.signum() * (PI - 2.0 * alpha); // TAYLOR
         tangent = (theta / imag_norm) * imag_vector;
     } else {
-        println!("so3::log else");
         theta = 2.0 * (imag_norm / real_factor).atan();
         tangent = (theta / imag_norm) * imag_vector;
     }
@@ -146,9 +109,8 @@ mod tests {
 
     use super::*;
 
-    // The best precision I get for a round trip
-    // with exact trigonometric computations ("else" branches)
-    // is around 1e-6.
+    // The best precision I get for round trips with quickcheck random inputs
+    // with exact trigonometric computations ("else" branches) is around 1e-6.
     const EPSILON_ROUNDTRIP_APPROX: Float = 1e-6;
 
     #[test]
@@ -157,54 +119,19 @@ mod tests {
         assert_eq!(w, round_trip_from_algebra(w));
     }
 
-    #[test]
-    // Unit test with a case that doesn't go better than 1e-6 on round trip error.
-    // Even in exact computation branches (set EPSILON_TAYLOR = 1e-30 for example).
-    fn log_exp_round_trip_1() {
-        let rotation = UnitQuaternion::from_euler_angles(52.472717, 63.55043, -70.95492);
-        assert_relative_eq!(
-            rotation,
-            round_trip_from_group(rotation),
-            epsilon = EPSILON_ROUNDTRIP_APPROX
-        );
-    }
-
-    #[test]
-    // Unit test to try to use taylor approx with < 0.1
-    fn log_exp_round_trip_2() {
-        let rotation = UnitQuaternion::from_euler_angles(7.955124, 38.33348, 22.914268);
-        assert_relative_eq!(
-            rotation,
-            round_trip_from_group(rotation),
-            epsilon = EPSILON_ROUNDTRIP_APPROX
-        );
-    }
-
-    #[test]
-    // Unit test to try to use taylor approx with < 0.1
-    fn log_exp_round_trip_3() {
-        let rotation = UnitQuaternion::from_euler_angles(-23.796371, -17.82396, -52.80335);
-        assert_relative_eq!(
-            rotation,
-            round_trip_from_group(rotation),
-            epsilon = EPSILON_ROUNDTRIP_APPROX
-        );
-    }
-
-    #[test]
-    // Unit test to try to use taylor approx with < 0.1
-    fn log_exp_round_trip_4() {
-        let rotation = UnitQuaternion::from_euler_angles(0.0, -81.6, 0.0);
-        assert_relative_eq!(
-            rotation,
-            round_trip_from_group(rotation),
-            epsilon = EPSILON_ROUNDTRIP_APPROX
-        );
-    }
-
     // PROPERTY TESTS ################################################
 
     quickcheck! {
+        fn hat_vee_roundtrip(x: Float, y: Float, z: Float) -> bool {
+            let element = Vector3::new(x,y,z);
+            element == vee(hat(element))
+        }
+
+        fn hat_2_ok(x: Float, y: Float, z: Float) -> bool {
+            let element = Vector3::new(x,y,z);
+            hat_2(element) == hat(element) * hat(element)
+        }
+
         fn log_exp_round_trip(roll: Float, pitch: Float, yaw: Float) -> bool {
             let rotation = gen_rotation(roll, pitch, yaw);
             relative_eq!(
@@ -212,20 +139,6 @@ mod tests {
                 round_trip_from_group(rotation),
                 epsilon = EPSILON_ROUNDTRIP_APPROX
             )
-        }
-
-        fn hat_2_ok(x: Float, y: Float, z: Float) -> bool {
-            let element = Vector3::new(x,y,z);
-            relative_eq!(
-                hat_2(element),
-                hat(element) * hat(element),
-                epsilon = EPSILON_ROUNDTRIP_APPROX
-            )
-        }
-
-        fn hat_vee_roundtrip(x: Float, y: Float, z: Float) -> bool {
-            let element = Vector3::new(x,y,z);
-            element == vee(hat(element))
         }
     }
 
