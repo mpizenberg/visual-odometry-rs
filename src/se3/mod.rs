@@ -6,6 +6,7 @@
 
 use nalgebra::{Isometry3, Matrix3, Matrix4, Translation3, Vector3, UnitQuaternion, Quaternion};
 use so3;
+use std::f32::consts::PI;
 
 pub type Float = f32;
 
@@ -79,24 +80,38 @@ pub fn exp(xi: Twist) -> Isometry3<Float> {
 // Compute the logarithm map from the Lie group SE3 to the Lie algebra se3.
 // Inverse of the exponential map.
 pub fn log(iso: Isometry3<Float>) -> Twist {
-    let (w, theta) = so3::log(iso.rotation);
-    let theta_2 = theta * theta;
-    let (omega, omega_2) = (so3::hat(w), so3::hat_2(w));
-    let v_inv = if theta.abs() < EPSILON_TAYLOR_SERIES {
-        let real_factor = iso.rotation.scalar();
-        let imag_norm_2 = iso.rotation.vector().norm_squared();
+    let imag_vector = iso.rotation.vector();
+    let imag_norm_2 = imag_vector.norm_squared();
+    let imag_norm = imag_norm_2.sqrt();
+    let real_factor = iso.rotation.scalar();
+    let w;
+    let v_inv;
+    if imag_norm < EPSILON_TAYLOR_SERIES {
+        let atan_coef_by_imag_norm = 2.0 / real_factor; // TAYLOR
+        let theta = atan_coef_by_imag_norm * imag_norm;
+        w = atan_coef_by_imag_norm * imag_vector;
+        let (omega, omega_2) = (so3::hat(w), so3::hat_2(w));
         let x_2 = imag_norm_2 / (real_factor * real_factor);
-        // Taylor series from:
-        // http://www.wolframalpha.com/input/?i=1%2F(4*(atan(x)%5E2))+*+(1+-+atan(x)%2Fx)
-        let coef_omega_2 = _1_12 * (1.0 + _1_15 * x_2);
-        Matrix3::identity() - 0.5 * omega + coef_omega_2 * omega_2
-
-    } else {
+        let coef_omega_2 = _1_12 * (1.0 + _1_15 * x_2); // TAYLOR
+        v_inv = Matrix3::identity() - 0.5 * omega + coef_omega_2 * omega_2;
+    } else if real_factor.abs() < EPSILON_TAYLOR_SERIES {
+        let alpha = real_factor.abs() / imag_norm;
+        let theta = real_factor.signum() * (PI - 2.0 * alpha); // TAYLOR
+        let theta_2 = theta * theta;
         let half_theta = 0.5 * theta;
-        let real_factor = iso.rotation.scalar();
-        let imag_norm = iso.rotation.vector().norm_squared().sqrt();
+        w = (theta / imag_norm) * imag_vector;
+        let (omega, omega_2) = (so3::hat(w), so3::hat_2(w));
+        // TODO improve here by using Taylor series.
         let coef_omega_2 = (1.0 - half_theta * real_factor / imag_norm) / theta_2;
-        Matrix3::identity() - 0.5 * omega + coef_omega_2 * omega_2
+        v_inv = Matrix3::identity() - 0.5 * omega + coef_omega_2 * omega_2;
+    } else {
+        let theta = 2.0 * (imag_norm / real_factor).atan();
+        let theta_2 = theta * theta;
+        let half_theta = 0.5 * theta;
+        w = (theta / imag_norm) * imag_vector;
+        let (omega, omega_2) = (so3::hat(w), so3::hat_2(w));
+        let coef_omega_2 = (1.0 - half_theta * real_factor / imag_norm) / theta_2;
+        v_inv = Matrix3::identity() - 0.5 * omega + coef_omega_2 * omega_2;
     };
     Twist {
         v: v_inv * iso.translation.vector,
