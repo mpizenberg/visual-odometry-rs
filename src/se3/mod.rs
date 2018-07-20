@@ -4,16 +4,19 @@
 //     * details: http://ethaneade.com/lie.pdf
 //     * summary: http://ethaneade.com/lie_groups.pdf
 
-use nalgebra::{Isometry3, Matrix3, Matrix4, Translation3, Vector3};
+use nalgebra::{Isometry3, Matrix3, Matrix4, Translation3, Vector3, UnitQuaternion, Quaternion};
 use so3;
 
 pub type Float = f32;
 
 const EPSILON_TAYLOR_SERIES: Float = 1e-2;
+const EPSILON_TAYLOR_SERIES_2: Float = EPSILON_TAYLOR_SERIES * EPSILON_TAYLOR_SERIES;
 const _1_6: Float = 1.0 / 6.0;
+const _1_8: Float = 0.125;
 const _1_12: Float = 1.0 / 12.0;
 const _1_15: Float = 1.0 / 15.0;
 const _1_24: Float = 1.0 / 24.0;
+const _1_48: Float = 1.0 / 48.0;
 const _1_120: Float = 1.0 / 120.0;
 
 #[derive(PartialEq, Debug, Copy, Clone)]
@@ -48,15 +51,28 @@ pub fn vee(mat: Matrix4<Float>) -> Twist {
 // Compute the exponential map from Lie algebra se3 to Lie group SE3.
 // Goes from se3 parameterization to SE3 element (rigid body motion).
 pub fn exp(xi: Twist) -> Isometry3<Float> {
-    let (rotation, theta) = so3::exp(xi.w);
-    let theta_2 = theta * theta;
+    let theta_2 = xi.w.norm_squared();
     let (omega, omega_2) = (so3::hat(xi.w), so3::hat_2(xi.w));
-    let v = if theta < EPSILON_TAYLOR_SERIES {
-        Matrix3::identity() + (0.5 - _1_24 * theta_2) * omega + (_1_6 - _1_120 * theta_2) * omega_2
+    let real_factor;
+    let imag_factor;
+    let v;
+    if theta_2 < EPSILON_TAYLOR_SERIES_2 {
+        real_factor = 1.0 - _1_8 * theta_2; // TAYLOR
+        imag_factor = 0.5 - _1_48 * theta_2; // TAYLOR
+        let coef_omega = 0.5 - _1_24 * theta_2; // TAYLOR
+        let coef_omega_2 = _1_6 - _1_120 * theta_2; // TAYLOR
+        v = Matrix3::identity() + coef_omega * omega + coef_omega_2 * omega_2;
     } else {
-        Matrix3::identity() + (1.0 - theta.cos()) / theta_2 * omega
-            + (theta - theta.sin()) / (theta * theta_2) * omega_2
+        let theta = theta_2.sqrt();
+        let half_theta = 0.5 * theta;
+        real_factor = half_theta.cos();
+        imag_factor = half_theta.sin() / theta;
+        let coef_omega = (1.0 - theta.cos()) / theta_2;
+        let coef_omega_2 = (theta - theta.sin()) / (theta * theta_2);
+        v = Matrix3::identity() + coef_omega * omega + coef_omega_2 * omega_2
     };
+    let rotation =
+        UnitQuaternion::from_quaternion(Quaternion::from_parts(real_factor, imag_factor * xi.w));
     Isometry3::from_parts(Translation3::from_vector(v * xi.v), rotation)
 }
 
