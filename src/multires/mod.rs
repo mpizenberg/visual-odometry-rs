@@ -90,6 +90,36 @@ pub fn gradients(multires_mat: &Vec<DMatrix<u8>>) -> Vec<DMatrix<u16>> {
         .collect()
 }
 
+pub fn gradients_xy(multires_mat: &Vec<DMatrix<u8>>) -> Vec<(DMatrix<i16>, DMatrix<i16>)> {
+    let nb_levels = multires_mat.len();
+    multires_mat
+        .iter()
+        .take(nb_levels - 1)
+        .map(|mat| {
+            (
+                halve(mat, gradient_x).unwrap(),
+                halve(mat, gradient_y).unwrap(),
+            )
+        })
+        .collect()
+}
+
+pub fn gradient_x(a: u8, b: u8, c: u8, d: u8) -> i16 {
+    let a = a as i16;
+    let b = b as i16;
+    let c = c as i16;
+    let d = d as i16;
+    (c + d - a - b) / 2
+}
+
+pub fn gradient_y(a: u8, b: u8, c: u8, d: u8) -> i16 {
+    let a = a as i16;
+    let b = b as i16;
+    let c = c as i16;
+    let d = d as i16;
+    (b - a + d - c) / 2
+}
+
 fn gradient_squared_norm(a: u8, b: u8, c: u8, d: u8) -> u16 {
     let a = a as i32;
     let b = b as i32;
