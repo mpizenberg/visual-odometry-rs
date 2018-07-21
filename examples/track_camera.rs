@@ -75,6 +75,8 @@ fn track(
     let mut all_jacobians = Vec::new();
     let mut nb_candidates = 0;
     let mut nb_in_frame = 0;
+    // TODO: Convert the identity motion to initial se3 element
+    // to start the Gauss-Newton iterations.
     for (index, idepth_enum) in idepth_map.iter().enumerate() {
         if let InverseDepth::WithVariance(idepth, _variance) = idepth_enum {
             nb_candidates += 1;
@@ -84,10 +86,15 @@ fn track(
             if helper::in_image_bounds((reprojected[0], reprojected[1]), (nrows, ncols)) {
                 nb_in_frame += 1;
                 let jacobian = jacobian_at(reprojected, new_idepth, img_2, gx_2, gy_2, &focale);
+                // TODO: also compute the residual because it is needed
+                // for Gauss-Newton step computation.
+                // Below is the code from gauss_newton_2d example:
+                // let step = |a, b| jacobian(a, b).svd(true, true).solve(&res(a, b), EPSILON);
                 all_jacobians.push(jacobian);
             }
         }
     }
+    // TODO: Convert the estimated se3 into Isometry to compare it.
     println!("Image resolution: {} x {}", ncols, nrows);
     println!("Nb candidates: {}", nb_candidates);
     println!("Still in frame: {}", nb_in_frame);
