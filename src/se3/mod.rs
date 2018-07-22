@@ -4,9 +4,10 @@
 //     * details: http://ethaneade.com/lie.pdf
 //     * summary: http://ethaneade.com/lie_groups.pdf
 
-use nalgebra::{Isometry3, Matrix3, Matrix4, Translation3, Vector3, UnitQuaternion, Quaternion};
+use nalgebra::{Isometry3, Matrix3, Matrix4, Translation3, Vector3, Vector6, UnitQuaternion, Quaternion};
 use so3;
 use std::f32::consts::PI;
+use std::ops::Add;
 
 pub type Float = f32;
 
@@ -24,6 +25,26 @@ const _1_120: Float = 1.0 / 120.0;
 pub struct Twist {
     v: Vector3<Float>,
     w: so3::Element,
+}
+
+impl Add for Twist {
+    type Output = Twist;
+    fn add(self, other: Twist) -> Twist {
+        Twist { v: self.v + other.v, w: self.w + other.w }
+    }
+}
+
+pub fn from_vector(vec: Vector6<Float>) -> Twist {
+    Twist {
+        v: Vector3::new(vec[0], vec[1], vec[2]),
+        w: Vector3::new(vec[3], vec[4], vec[5]),
+    }
+}
+
+pub fn to_vector(twist: Twist) -> Vector6<Float> {
+    let v = twist.v;
+    let w = twist.w;
+    Vector6::new(v[0], v[1], v[2], w[0], w[1], w[2])
 }
 
 // Hat operator. Goes from se3 parameters to se3 element (4x4 matrix).
