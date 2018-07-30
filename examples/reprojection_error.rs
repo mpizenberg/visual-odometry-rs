@@ -18,7 +18,7 @@ fn main() {
     let (multires_camera_1, multires_rgb_1, depth_1) =
         icl_nuim::prepare_data(1, &all_extrinsics).unwrap();
     let (multires_camera_2, multires_rgb_2, _) =
-        icl_nuim::prepare_data(600, &all_extrinsics).unwrap();
+        icl_nuim::prepare_data(100, &all_extrinsics).unwrap();
 
     let candidates = candidates::select(&multires::gradients(&multires_rgb_1))
         .pop()

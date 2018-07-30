@@ -2,6 +2,7 @@ use camera::Camera;
 use helper;
 use inverse_depth::InverseDepth;
 use nalgebra::{DMatrix, Point2};
+use std::f32;
 
 pub fn reprojection_error(
     idepth: &DMatrix<InverseDepth>,
@@ -46,5 +47,65 @@ pub fn reprojection_error(
             }
         }
     });
+
     reprojection_error_accum / total_count as f32
+}
+
+// pub fn gauss_newton<Observation, Model, Jacobian, Residual, Energy>(
+//     eval: fn(&Observation, &Model) -> (Jacobian, Residual),
+//     step: fn(&Jacobian, &Residual, &Model) -> Model,
+//     stop_criterion: fn(usize, Energy, &Residual) -> (Energy, bool),
+//     observation: &Observation,
+//     initial_model: Model,
+// ) -> (Model, usize) {
+//     (initial_model, 0)
+// }
+
+pub fn gauss_newton_fn<Observation, Model, Jacobian, Residual, EvalFn, StepFn, CriterionFn>(
+    eval: EvalFn,
+    step: StepFn,
+    stop_criterion: CriterionFn,
+    observation: &Observation,
+    initial_model: Model,
+) -> (Model, usize)
+where
+    Model: Clone,
+    EvalFn: Fn(&Observation, &Model) -> (Jacobian, Residual),
+    StepFn: Fn(&Jacobian, &Residual, &Model) -> Model,
+    CriterionFn: Fn(usize, f32, &Residual) -> (f32, Continue),
+{
+    let mut nb_iter = 0;
+    let mut energy = f32::INFINITY;
+    let mut model = initial_model;
+    let mut previous_model = model.clone();
+    // For algorithm simplicity, we accept to compute the jacobian
+    // one time more than needed, since eval returns both jacobian and residual
+    // and we need residual to evaluate the stop criterion.
+    let (mut jacobian, mut residual) = eval(observation, &model);
+    loop {
+        let (new_energy, continuation) = stop_criterion(nb_iter, energy, &residual);
+        match continuation {
+            Continue::Stop => break,
+            Continue::Backward => {
+                model = previous_model;
+                break;
+            }
+            Continue::Forward => {
+                nb_iter = nb_iter + 1;
+                energy = new_energy;
+                previous_model = model;
+                model = step(&jacobian, &residual, &previous_model);
+                let (new_jacobian, new_residual) = eval(observation, &model);
+                jacobian = new_jacobian;
+                residual = new_residual;
+            }
+        }
+    }
+    (model, nb_iter)
+}
+
+pub enum Continue {
+    Stop,
+    Forward,
+    Backward,
 }

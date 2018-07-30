@@ -42,7 +42,7 @@ fn main() {
         |mat| mat,
         |mat| multires::halve(&mat, fuse),
     );
-    let level = 3;
+    let level = 5;
     let cam_1 = &multires_camera_1[level];
     let cam_2 = &multires_camera_2[level];
     let intrinsics = &cam_2.intrinsics;
@@ -96,9 +96,10 @@ fn track(
         }
         let twist_step = twist_step_and_residuals.0;
         let residuals = twist_step_and_residuals.1;
+        // let energy: Float = residuals.norm_squared().sqrt();
         let energy: Float = residuals.iter().map(|x| x.abs()).sum::<f32>() / residuals.len() as f32;
         println!("energy: {}", energy);
-        twist_vec = twist_vec - 0.01 * twist_step;
+        twist_vec = twist_vec - 0.1 * twist_step;
         motion = se3::exp(se3::from_vector(twist_vec));
     }
     motion
