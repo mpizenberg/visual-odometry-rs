@@ -1,8 +1,10 @@
 //! Getting started with nalgebra
 
+extern crate computer_vision_rs as cv;
 extern crate nalgebra as na;
 extern crate rand;
 
+use cv::optimization::{self, Continue};
 use na::DVector;
 use rand::distributions::Uniform;
 use rand::{SeedableRng, StdRng};
@@ -22,26 +24,32 @@ fn main() {
     let noise: DVector<f32> = DVector::from_distribution(nb, &mut distribution, &mut rng);
     let data_noise = f(1.5) + 0.05 * noise;
 
-    // Energy
-    let res = |a| f(a) - &data_noise;
-    let energy = |a| res(a).norm_squared();
+    // Using the optimization module.
+    let eval = |observation: &DVector<f32>, model: &f32| {
+        let f_model = f(*model);
+        let jacobian = -1.0 * domain.component_mul(&f_model);
+        let residual = f_model - observation;
+        (jacobian, residual)
+    };
+    let step = |jacobian: &DVector<f32>, residual: &DVector<f32>, model: &f32| {
+        println!("a_n: {}", model);
+        let gradient = 2.0 * jacobian.component_mul(residual).iter().sum::<f32>();
+        let hessian = 2.0 * jacobian.norm_squared();
+        model - gradient / hessian
+    };
+    let stop_criterion = |nb_iter, _, residual: &DVector<f32>| {
+        let new_energy = residual.norm_squared();
+        // println!("E_n: {}", new_energy);
+        let continuation = if nb_iter < 5 {
+            Continue::Forward
+        } else {
+            Continue::Stop
+        };
+        (new_energy, continuation)
+    };
 
-    // Gauss Newton
-    let d_res = |a| -1.0 * domain.component_mul(&f(a));
-    let gradient: &Fn(f32) -> f32 = &|a| 2.0 * d_res(a).component_mul(&res(a)).iter().sum::<f32>();
-    let hessian = |a| 2.0 * d_res(a).norm_squared();
-
-    // Initialization
-    let mut x_n = 0.0;
-    let mut e_n = energy(x_n);
-    println!("x_n: {}, E_n: {}", x_n, e_n);
-
-    // Iterate
-    for _ in 0..5 {
-        x_n = x_n - gradient(x_n) / hessian(x_n);
-        e_n = energy(x_n);
-        println!("x_n: {}, E_n: {}", x_n, e_n);
-    }
+    let (model, _) = optimization::gauss_newton(eval, step, stop_criterion, &data_noise, 0.0);
+    println!("a: {}", model);
 }
 
 fn linspace(start: f32, end: f32, nb: usize) -> DVector<f32> {
