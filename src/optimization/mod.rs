@@ -61,7 +61,7 @@ pub fn reprojection_error(
 //     (initial_model, 0)
 // }
 
-pub fn gauss_newton_fn<Observation, Model, Jacobian, Residual, EvalFn, StepFn, CriterionFn>(
+pub fn gauss_newton<Observation, Model, Jacobian, Residual, EvalFn, StepFn, CriterionFn>(
     eval: EvalFn,
     step: StepFn,
     stop_criterion: CriterionFn,
@@ -69,19 +69,29 @@ pub fn gauss_newton_fn<Observation, Model, Jacobian, Residual, EvalFn, StepFn, C
     initial_model: Model,
 ) -> (Model, usize)
 where
-    Model: Clone,
     EvalFn: Fn(&Observation, &Model) -> (Jacobian, Residual),
     StepFn: Fn(&Jacobian, &Residual, &Model) -> Model,
     CriterionFn: Fn(usize, f32, &Residual) -> (f32, Continue),
 {
-    let mut nb_iter = 0;
+    // Manual first iteration enable avoiding to have Clone for model.
+    // Otherwise, the compiler doesn't know if previous_model has
+    // been initialized in the backward branch.
     let mut energy = f32::INFINITY;
-    let mut model = initial_model;
-    let mut previous_model = model.clone();
-    // For algorithm simplicity, we accept to compute the jacobian
-    // one time more than needed, since eval returns both jacobian and residual
-    // and we need residual to evaluate the stop criterion.
-    let (mut jacobian, mut residual) = eval(observation, &model);
+    let (mut jacobian, mut residual) = eval(observation, &initial_model);
+    match stop_criterion(0, energy, &residual) {
+        (new_energy, Continue::Forward) => {
+            energy = new_energy;
+        }
+        _ => return (initial_model, 0),
+    }
+    let mut nb_iter = 1;
+    let mut model = step(&jacobian, &residual, &initial_model);
+    let mut previous_model = initial_model;
+    let (new_jacobian, new_residual) = eval(observation, &model);
+    jacobian = new_jacobian;
+    residual = new_residual;
+
+    // After first iteration, loop until stop criterion.
     loop {
         let (new_energy, continuation) = stop_criterion(nb_iter, energy, &residual);
         match continuation {
