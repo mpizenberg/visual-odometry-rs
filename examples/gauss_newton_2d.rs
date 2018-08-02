@@ -1,9 +1,11 @@
 //! Gauss Newton optimization for 2D
 
+extern crate computer_vision_rs as cv;
 extern crate nalgebra as na;
 extern crate rand;
 
-use na::{DMatrix, DVector, Vector2};
+use cv::optimization::{self, Continue};
+use na::{DMatrix, DVector, MatrixMN, Vector2};
 use rand::distributions::Uniform;
 use rand::thread_rng;
 use rand::{SeedableRng, StdRng};
@@ -29,47 +31,52 @@ fn main() {
     let mut _rng_seed: StdRng = SeedableRng::from_seed(seed);
     let mut _rng = thread_rng();
     let mut distribution = Uniform::new(-1.0, 1.0);
-    let noise: DVector<f32> = DVector::from_distribution(nb * nb, &mut distribution, &mut _rng);
+    let noise: DVector<f32> =
+        DVector::from_distribution(nb * nb, &mut distribution, &mut _rng_seed);
     let data_noise = f(10.0, 3.0) + 0.1 * noise;
 
-    // Energy
-    let res = |a, b| f(a, b) - &data_noise;
-    let energy = |a, b| res(a, b).norm_squared();
+    // Using the optimization module.
+    let eval = |observation: &DVector<f32>, model: &Vector2<f32>| {
+        let a = model[0];
+        let b = model[1];
+        let radius_grid = radius(a, b);
+        let f_model = radius_grid.map(|r| a * sinc(r));
 
-    // Partial derivatives
-    let d_res_a = |a, b| radius(a, b).map(&sinc);
-    let d_res_b = |a, b| {
-        radius(a, b)
+        let residual = f_model - observation;
+        let d_res_a = radius_grid.map(&sinc);
+        let d_res_b = radius_grid
             .map(|r| a * (cos(r) - sinc(r)) / (r * r))
-            .component_mul(&x_grid.map(|x| b - x))
+            .component_mul(&x_grid.map(|x| b - x));
+        // let jacobian: MatrixMN<_, _, na::U2> = MatrixMN::from_columns(&[d_res_a, d_res_b]);
+        let jacobian = MatrixMN::from_columns(&[d_res_a, d_res_b]);
+
+        (jacobian, residual)
     };
-    let jacobian = |a, b| DMatrix::from_columns(&[d_res_a(a, b), d_res_b(a, b)]);
 
-    // Gradient and Hessian
-    // let gradient = |a, b| jacobian(a, b).tr_mul(&res(a, b));
-    // let hessian = |a, b| {
-    //     let jac = jacobian(a, b);
-    //     jac.tr_mul(&jac)
-    // };
+    let step = |jacobian: &MatrixMN<f32, na::Dynamic, na::U2>,
+                residual: &DVector<f32>,
+                model: &Vector2<f32>| {
+        println!("(a_n, b_n): ({}, {})", model[0], model[1]);
+        model - jacobian.clone().svd(true, true).solve(residual, EPSILON)
+    };
 
-    // Iteration step
-    let step = |a, b| jacobian(a, b).svd(true, true).solve(&res(a, b), EPSILON);
-    // let step = |a, b| hessian(a, b).try_inverse().unwrap() * gradient(a, b);
+    let stop_criterion = |nb_iter, _, residual: &DVector<f32>| {
+        let new_energy = residual.norm_squared();
+        let continuation = if nb_iter < 6 {
+            Continue::Forward
+        } else {
+            Continue::Stop
+        };
+        (new_energy, continuation)
+    };
 
-    // Initialization
-    let mut x_n = Vector2::new(5.0, 1.0);
-    let (mut a_n, mut b_n) = (x_n[0], x_n[1]);
-    let mut e_n = energy(a_n, b_n);
-    println!("a_n: {}, b_n: {}, E_n: {}", a_n, b_n, e_n);
-
-    // Iterate
-    for _ in 0..8 {
-        x_n = x_n - step(a_n, b_n);
-        a_n = x_n[0];
-        b_n = x_n[1];
-        e_n = energy(a_n, b_n);
-        println!("a_n: {}, b_n: {}, E_n: {}", a_n, b_n, e_n);
-    }
+    let _ = optimization::gauss_newton(
+        eval,
+        step,
+        stop_criterion,
+        &data_noise,
+        Vector2::new(5.0, 1.0),
+    );
 }
 
 // Helper functions
