@@ -9,7 +9,7 @@ use cv::icl_nuim;
 use cv::interop;
 use cv::inverse_depth::{self, InverseDepth};
 use cv::multires;
-use cv::optimization;
+use cv::optimization::{self, Continue};
 use cv::se3;
 
 use nalgebra::base::dimension::Dynamic;
@@ -42,7 +42,7 @@ fn main() {
         |mat| mat,
         |mat| multires::halve(&mat, fuse),
     );
-    let level = 5;
+    let level = 4;
     let cam_1 = &multires_camera_1[level];
     let cam_2 = &multires_camera_2[level];
     let intrinsics = &cam_2.intrinsics;
@@ -81,65 +81,74 @@ fn track(
     //         * (4) Accumulate Jacobians products in accumulated Hessian
     //         * (5) Solve the step computation using Levenberg-Marquardt dampening instead of the Gauss-Newton
     //         * (6) Update (recompute) the residuals
-    let mut motion = Isometry3::identity();
-    let (f, (sx, sy)) = (intrinsics.focal_length, intrinsics.scaling);
-    let focale = Focale(f * sx, f * sy);
-    let mut twist_vec = se3::to_vector(se3::log(motion));
-    for _ in 0..20 {
-        let twist_step_and_residuals;
-        {
-            let reprojection = |point, idepth| reproject(point, idepth, intrinsics, &motion);
-            let eval = |col, row, point, idepth| {
-                jacobian_at(point, idepth, img_2, gx_2, gy_2, &focale, img_1[(row, col)])
-            };
-            twist_step_and_residuals = gauss_newton_step(idepth_map, reprojection, eval);
-        }
-        let twist_step = twist_step_and_residuals.0;
-        let residuals = twist_step_and_residuals.1;
-        // let energy: Float = residuals.norm_squared().sqrt();
-        let energy: Float = residuals.iter().map(|x| x.abs()).sum::<f32>() / residuals.len() as f32;
-        println!("energy: {}", energy);
-        twist_vec = twist_vec - 0.1 * twist_step;
-        motion = se3::exp(se3::from_vector(twist_vec));
-    }
-    motion
+
+    let (twist, _) = optimization::gauss_newton(
+        &eval,
+        &step,
+        &stop_criterion,
+        &(intrinsics, idepth_map, img_1, img_2, gx_2, gy_2),
+        se3::to_vector(se3::log(Isometry3::identity())),
+    );
+    se3::exp(se3::from_vector(twist))
 }
 
-fn gauss_newton_step<F, G>(
-    idepth_map: &DMatrix<InverseDepth>,
-    reprojection: F,
-    eval: G,
-) -> (Vector6<Float>, DVector<Float>)
-where
-    F: Fn(Point2<Float>, Float) -> (Point2<Float>, Float),
-    G: Fn(usize, usize, Point2<Float>, Float) -> (Jacobian, Residual),
-{
+fn stop_criterion(nb_iter: usize, energy: f32, residuals: &Vec<Residual>) -> (f32, Continue) {
+    println!("energy: {}", energy);
+    let new_energy: f32 = residuals.iter().map(|x| x.abs()).sum::<f32>() / residuals.len() as f32;
+    let continuation = if nb_iter < 12 {
+        Continue::Forward
+    } else {
+        Continue::Stop
+    };
+    (new_energy, continuation)
+}
+
+fn step(jacobian: &Vec<Jacobian>, residuals: &Vec<Residual>, model: &Vector6<f32>) -> Vector6<f32> {
+    let full_jacobian = MatrixMN::<_, _, Dynamic>::from_columns(jacobian.as_slice());
+    let full_residual = DVector::from_column_slice(residuals.len(), residuals.as_slice());
+    let twist_step = full_jacobian
+        .transpose()
+        .svd(true, true)
+        .solve(&full_residual, EPSILON);
+    model - 0.1 * twist_step
+}
+
+type Observation<'a> = (
+    &'a Intrinsics,
+    &'a DMatrix<InverseDepth>,
+    &'a DMatrix<u8>,
+    &'a DMatrix<u8>,
+    &'a DMatrix<i16>,
+    &'a DMatrix<i16>,
+);
+
+fn eval(observation: &Observation, model: &Vector6<f32>) -> (Vec<Jacobian>, Vec<Residual>) {
+    let (intrinsics, idepth_map, img_1, img_2, gx_2, gy_2) = observation;
     let mut all_jacobians = Vec::new();
     let mut all_residuals = Vec::new();
-    // let mut nb_candidates = 0;
-    // let mut nb_in_frame = 0;
     let (nrows, ncols) = idepth_map.shape();
+    let motion = se3::exp(se3::from_vector(*model));
+    let (f, (sx, sy)) = (intrinsics.focal_length, intrinsics.scaling);
+    let focale = Focale(f * sx, f * sy);
+    let eval_at = |point, idepth, color_ref| {
+        jacobian_at(point, idepth, img_2, gx_2, gy_2, &focale, color_ref)
+    };
     for (index, idepth_enum) in idepth_map.iter().enumerate() {
         if let InverseDepth::WithVariance(idepth, _variance) = idepth_enum {
             // nb_candidates += 1;
             let (col, row) = helper::div_rem(index, nrows);
             let point = Point2::new(col as f32, row as f32);
-            let (reprojected, new_idepth) = reprojection(point, *idepth);
+            let (reprojected, new_idepth) = reproject(point, *idepth, intrinsics, &motion);
             if helper::in_image_bounds((reprojected[0], reprojected[1]), (nrows, ncols)) {
                 // nb_in_frame += 1;
-                let (jacobian, residual) = eval(col, row, reprojected, new_idepth);
+                let color_ref = img_1[(row, col)];
+                let (jacobian, residual) = eval_at(reprojected, new_idepth, color_ref);
                 all_jacobians.push(jacobian);
                 all_residuals.push(residual);
             }
         }
     }
-    let full_jacobian = MatrixMN::<_, _, Dynamic>::from_columns(all_jacobians.as_slice());
-    let full_residual = DVector::from_column_slice(all_residuals.len(), all_residuals.as_slice());
-    let twist_step = full_jacobian
-        .transpose()
-        .svd(true, true)
-        .solve(&full_residual, EPSILON);
-    (twist_step, full_residual)
+    (all_jacobians, all_residuals)
 }
 
 // Step (1) is done by multiplying by 2 the threshold and recomputing the residuals every time (max 5 times) which seems very ineficient. But maybe it hapens rarely if the default threshold already allows more than 40% of points to have lower residuals.
