@@ -1,8 +1,10 @@
 use camera::Camera;
 use helper;
 use inverse_depth::InverseDepth;
-use nalgebra::{DMatrix, Point2};
+use nalgebra::{DMatrix, Point2, Scalar};
+use num_traits::{self, NumCast};
 use std::f32;
+use std::ops::{Add, Mul};
 
 pub fn reprojection_error(
     idepth: &DMatrix<InverseDepth>,
@@ -118,4 +120,34 @@ pub enum Continue {
     Stop,
     Forward,
     Backward,
+}
+
+pub fn interpolate_with<T, F>(
+    indices: (usize, usize),
+    coefs: (F, F, F, F),
+    matrix: &DMatrix<T>,
+) -> F
+where
+    T: Scalar + NumCast,
+    F: NumCast + Add<F, Output = F> + Mul<F, Output = F>,
+{
+    let (u, v) = indices;
+    let (a, b, c, d) = coefs;
+    let v_u: F = num_traits::cast(matrix[(v, u)]).unwrap();
+    let v1_u: F = num_traits::cast(matrix[(v + 1, u)]).unwrap();
+    let v_u1: F = num_traits::cast(matrix[(v, u + 1)]).unwrap();
+    let v1_u1: F = num_traits::cast(matrix[(v + 1, u + 1)]).unwrap();
+    a * v_u + b * v1_u + c * v_u1 + d * v1_u1
+}
+
+pub fn linear_interpolator(coordinates: Point2<f32>) -> ((usize, usize), (f32, f32, f32, f32)) {
+    let x = coordinates[0];
+    let y = coordinates[1];
+    let u = x.floor() as usize;
+    let v = y.floor() as usize;
+    let a = x - u as f32;
+    let b = y - v as f32;
+    let _a = 1.0 - a;
+    let _b = 1.0 - b;
+    ((u, v), (_a * _b, _a * b, a * _b, a * b))
 }

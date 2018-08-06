@@ -1,6 +1,7 @@
 extern crate byteorder;
 extern crate image;
 extern crate nalgebra;
+extern crate num_traits;
 extern crate png;
 extern crate rand;
 

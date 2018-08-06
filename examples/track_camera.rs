@@ -2,11 +2,10 @@ extern crate computer_vision_rs as cv;
 extern crate image;
 extern crate nalgebra;
 
-use cv::camera::{Extrinsics, Intrinsics};
+use cv::camera::{Camera, Extrinsics, Intrinsics};
 use cv::candidates;
 use cv::helper;
 use cv::icl_nuim;
-use cv::interop;
 use cv::inverse_depth::{self, InverseDepth};
 use cv::multires;
 use cv::optimization::{self, Continue};
@@ -20,8 +19,7 @@ fn main() {
     let all_extrinsics = Extrinsics::read_from_tum_file("data/trajectory-gt.txt").unwrap();
     let (multires_camera_1, multires_img_1, depth_1) =
         icl_nuim::prepare_data(1, &all_extrinsics).unwrap();
-    let (multires_camera_2, multires_img_2, _) =
-        icl_nuim::prepare_data(2, &all_extrinsics).unwrap();
+    let (_, multires_img_2, _) = icl_nuim::prepare_data(2, &all_extrinsics).unwrap();
     let multires_gradients_1_norm = multires::gradients(&multires_img_1);
     let multires_gradients_2_xy = multires::gradients_xy(&multires_img_2);
     let candidates = candidates::select(&multires_gradients_1_norm)
@@ -42,36 +40,21 @@ fn main() {
         |mat| mat,
         |mat| multires::halve(&mat, fuse),
     );
-    let level = 4;
-    let cam_1 = &multires_camera_1[level];
-    let cam_2 = &multires_camera_2[level];
-    let intrinsics = &cam_2.intrinsics;
-    let img_1 = &multires_img_1[level];
-    interop::image_from_matrix(&img_1)
-        .save("out/track_img_1.png")
-        .unwrap();
-    let img_2 = &multires_img_2[level];
-    interop::image_from_matrix(&img_2)
-        .save("out/track_img_2.png")
-        .unwrap();
-    let idepth_map = &multires_idepth[level - 1];
-    let (gx_2, gy_2) = &multires_gradients_2_xy[level - 1];
-    let gt_energy = optimization::reprojection_error(idepth_map, cam_1, cam_2, img_1, img_2);
-    println!("Ground truth energy: {}", gt_energy);
-    let motion = track(intrinsics, idepth_map, img_1, img_2, gx_2, gy_2);
-    println!("Computed motion: {:?}", motion);
-    let iso_1 = Isometry3::from_parts(cam_1.extrinsics.translation, cam_1.extrinsics.rotation);
-    let iso_2 = Isometry3::from_parts(cam_2.extrinsics.translation, cam_2.extrinsics.rotation);
-    println!("Ground truth motion: {:?}", iso_2.inverse() * iso_1);
+    let _ = track(
+        &multires_camera_1,
+        &multires_idepth,
+        &multires_img_1,
+        &multires_img_2,
+        &multires_gradients_2_xy,
+    );
 }
 
 fn track(
-    intrinsics: &Intrinsics,
-    idepth_map: &DMatrix<InverseDepth>,
-    img_1: &DMatrix<u8>,
-    img_2: &DMatrix<u8>,
-    gx_2: &DMatrix<i16>,
-    gy_2: &DMatrix<i16>,
+    multires_camera_1: &Vec<Camera>,
+    multires_idepth_1: &Vec<DMatrix<InverseDepth>>,
+    multires_img_1: &Vec<DMatrix<u8>>,
+    multires_img_2: &Vec<DMatrix<u8>>,
+    multires_gradients_2: &Vec<(DMatrix<i16>, DMatrix<i16>)>,
 ) -> Isometry3<Float> {
     // * For each pyramid level (starting with lowest resolution):
     //     * (1) Compute the smallest residual energy threshold, such that more than 40% residuals of points ar under this threshold.
@@ -81,6 +64,13 @@ fn track(
     //         * (4) Accumulate Jacobians products in accumulated Hessian
     //         * (5) Solve the step computation using Levenberg-Marquardt dampening instead of the Gauss-Newton
     //         * (6) Update (recompute) the residuals
+    let level = 4;
+    let cam_1 = &multires_camera_1[level];
+    let intrinsics = &cam_1.intrinsics;
+    let img_1 = &multires_img_1[level];
+    let img_2 = &multires_img_2[level];
+    let idepth_map = &multires_idepth_1[level - 1];
+    let (gx_2, gy_2) = &multires_gradients_2[level - 1];
 
     let (twist, _) = optimization::gauss_newton(
         &eval,
@@ -89,6 +79,16 @@ fn track(
         &(intrinsics, idepth_map, img_1, img_2, gx_2, gy_2),
         se3::to_vector(se3::log(Isometry3::identity())),
     );
+
+    // Some ground truth logging.
+    // let gt_energy = optimization::reprojection_error(idepth_map, cam_1, cam_2, img_1, img_2);
+    // println!("Ground truth energy: {}", gt_energy);
+    // println!("Computed motion: {:?}", motion);
+    // let iso_1 = Isometry3::from_parts(cam_1.extrinsics.translation, cam_1.extrinsics.rotation);
+    // let iso_2 = Isometry3::from_parts(cam_2.extrinsics.translation, cam_2.extrinsics.rotation);
+    // println!("Ground truth motion: {:?}", iso_2.inverse() * iso_1);
+
+    // Return motion.
     se3::exp(se3::from_vector(twist))
 }
 
@@ -161,11 +161,6 @@ fn reproject(
     intrinsics: &Intrinsics,
     motion: &Isometry3<Float>,
 ) -> (Point2<Float>, Float) {
-    // * For each point of the current level:
-    //     * (2.1) Compute and save the back-projected position and depth in the new frame (if not out of frame)
-    //     * (2.2) Interpolate the color at this position
-    //     * (2.3) Interpolate and save the gradients at this position (useful later for (3))
-    //     * (2.4) Compute residuals with a Huber norm
     let homogeneous = intrinsics.project(motion * intrinsics.back_project(point, 1.0 / idepth));
     let new_idepth = 1.0 / homogeneous[2];
     let new_point = Point2::new(homogeneous[0] * new_idepth, homogeneous[1] * new_idepth);
@@ -178,8 +173,6 @@ struct Gradient(Float, Float);
 type Jacobian = Vector6<Float>;
 type Residual = Float;
 
-// Step (3) and (4) are done in the function `CoarseTracker::calcGSSSE()`. Now I guess "GS" holds for Gauss-Newton System or GradientS or something related to computing Jacobians. And the "SSE" part is a reference to SSE processor instructions (https://en.wikipedia.org/wiki/Streaming_SIMD_Extensions). Those enable a bit more efficiency of repeated computation, but it makes the code extremely obscure! If I ignore the SSE semantics in this, the code of this function is basically:
-
 fn jacobian_at(
     point: Point2<Float>,
     idepth: Float,
@@ -189,32 +182,13 @@ fn jacobian_at(
     focale: &Focale,
     img_origin_pixel: u8,
 ) -> (Jacobian, Residual) {
-    let ((u, v), (a, b, c, d)) = linear_interpolator(point);
-    let gx2_xy = a * gradient_x[(v, u)] as f32 + b * gradient_x[(v + 1, u)] as f32
-        + c * gradient_x[(v, u + 1)] as f32
-        + d * gradient_x[(v + 1, u + 1)] as f32;
-    let gy2_xy = a * gradient_y[(v, u)] as f32 + b * gradient_y[(v + 1, u)] as f32
-        + c * gradient_y[(v, u + 1)] as f32
-        + d * gradient_y[(v + 1, u + 1)] as f32;
+    let (indices, coefs) = optimization::linear_interpolator(point);
+    let gx2_xy = optimization::interpolate_with(indices, coefs, gradient_x);
+    let gy2_xy = optimization::interpolate_with(indices, coefs, gradient_y);
     let gradient = Gradient(gx2_xy, gy2_xy);
-    let img_xy = a * img[(v, u)] as f32 + b * img[(v + 1, u)] as f32 + c * img[(v, u + 1)] as f32
-        + d * img[(v + 1, u + 1)] as f32;
+    let img_xy = optimization::interpolate_with(indices, coefs, img);
     let residual = img_xy - img_origin_pixel as f32;
     (compute_jacobian(point, idepth, focale, gradient), residual)
-}
-
-fn linear_interpolator(
-    coordinates: Point2<Float>,
-) -> ((usize, usize), (Float, Float, Float, Float)) {
-    let x = coordinates[0];
-    let y = coordinates[1];
-    let u = x.floor() as usize;
-    let v = y.floor() as usize;
-    let a = x - u as f32;
-    let b = y - v as f32;
-    let _a = 1.0 - a;
-    let _b = 1.0 - b;
-    ((u, v), (_a * _b, _a * b, a * _b, a * b))
 }
 
 fn compute_jacobian(point: Point2<Float>, idepth: Float, f: &Focale, g: Gradient) -> Jacobian {
