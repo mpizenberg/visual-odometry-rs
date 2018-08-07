@@ -19,7 +19,8 @@ fn main() {
     let all_extrinsics = Extrinsics::read_from_tum_file("data/trajectory-gt.txt").unwrap();
     let (multires_camera_1, multires_img_1, depth_1) =
         icl_nuim::prepare_data(1, &all_extrinsics).unwrap();
-    let (_, multires_img_2, _) = icl_nuim::prepare_data(2, &all_extrinsics).unwrap();
+    let (multires_camera_2, multires_img_2, _) =
+        icl_nuim::prepare_data(10, &all_extrinsics).unwrap();
     let multires_gradients_1_norm = multires::gradients(&multires_img_1);
     let multires_gradients_2_xy = multires::gradients_xy(&multires_img_2);
     let candidates = candidates::select(&multires_gradients_1_norm)
@@ -34,7 +35,7 @@ fn main() {
         InverseDepth::Unknown,
         |idepth| idepth,
     );
-    let multires_idepth = multires::pyramid_with_max_n_levels(
+    let multires_idepth_1 = multires::pyramid_with_max_n_levels(
         5,
         idepth_candidates,
         |mat| mat,
@@ -42,7 +43,8 @@ fn main() {
     );
     let _ = track(
         &multires_camera_1,
-        &multires_idepth,
+        &multires_camera_2,
+        &multires_idepth_1,
         &multires_img_1,
         &multires_img_2,
         &multires_gradients_2_xy,
@@ -51,6 +53,7 @@ fn main() {
 
 fn track(
     multires_camera_1: &Vec<Camera>,
+    multires_camera_2: &Vec<Camera>,
     multires_idepth_1: &Vec<DMatrix<InverseDepth>>,
     multires_img_1: &Vec<DMatrix<u8>>,
     multires_img_2: &Vec<DMatrix<u8>>,
@@ -64,41 +67,51 @@ fn track(
     //         * (4) Accumulate Jacobians products in accumulated Hessian
     //         * (5) Solve the step computation using Levenberg-Marquardt dampening instead of the Gauss-Newton
     //         * (6) Update (recompute) the residuals
-    let level = 4;
-    let cam_1 = &multires_camera_1[level];
-    let intrinsics = &cam_1.intrinsics;
-    let img_1 = &multires_img_1[level];
-    let img_2 = &multires_img_2[level];
-    let idepth_map = &multires_idepth_1[level - 1];
-    let (gx_2, gy_2) = &multires_gradients_2[level - 1];
 
-    let (twist, _) = optimization::gauss_newton(
-        &eval,
-        &step,
-        &stop_criterion,
-        &(intrinsics, idepth_map, img_1, img_2, gx_2, gy_2),
-        se3::to_vector(se3::log(Isometry3::identity())),
-    );
+    let mut motion = Isometry3::identity();
+    let mut twist = se3::to_vector(se3::log(motion));
+    for level in (1..6).rev() {
+        println!("--- level {}", level);
+        let cam_1 = &multires_camera_1[level];
+        let cam_2 = &multires_camera_2[level];
+        let intrinsics = &cam_1.intrinsics;
+        let img_1 = &multires_img_1[level];
+        let img_2 = &multires_img_2[level];
+        let idepth_map = &multires_idepth_1[level - 1];
+        let (gx_2, gy_2) = &multires_gradients_2[level - 1];
 
-    // Some ground truth logging.
-    // let gt_energy = optimization::reprojection_error(idepth_map, cam_1, cam_2, img_1, img_2);
-    // println!("Ground truth energy: {}", gt_energy);
+        let (new_twist, _) = optimization::gauss_newton(
+            &eval,
+            &step,
+            &stop_criterion,
+            &(intrinsics, idepth_map, img_1, img_2, gx_2, gy_2),
+            twist,
+        );
+        twist = new_twist;
+        motion = se3::exp(se3::from_vector(twist));
+        // Some ground truth logging.
+        let gt_energy = optimization::reprojection_error(idepth_map, cam_1, cam_2, img_1, img_2);
+        println!("GT energy: {}", gt_energy);
+    }
+
     // println!("Computed motion: {:?}", motion);
     // let iso_1 = Isometry3::from_parts(cam_1.extrinsics.translation, cam_1.extrinsics.rotation);
     // let iso_2 = Isometry3::from_parts(cam_2.extrinsics.translation, cam_2.extrinsics.rotation);
     // println!("Ground truth motion: {:?}", iso_2.inverse() * iso_1);
 
     // Return motion.
-    se3::exp(se3::from_vector(twist))
+    motion
 }
 
 fn stop_criterion(nb_iter: usize, energy: f32, residuals: &Vec<Residual>) -> (f32, Continue) {
-    println!("energy: {}", energy);
     let new_energy: f32 = residuals.iter().map(|x| x.abs()).sum::<f32>() / residuals.len() as f32;
-    let continuation = if nb_iter < 12 {
-        Continue::Forward
-    } else {
+    println!("energy: {}", new_energy);
+    let continuation = if new_energy > energy {
+        Continue::Backward
+    } else if nb_iter >= 20 {
         Continue::Stop
+    } else {
+        Continue::Forward
     };
     (new_energy, continuation)
 }
