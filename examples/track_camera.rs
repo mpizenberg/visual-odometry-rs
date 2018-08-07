@@ -94,10 +94,17 @@ fn track(
         println!("GT energy: {}", gt_energy);
     }
 
-    // println!("Computed motion: {:?}", motion);
-    // let iso_1 = Isometry3::from_parts(cam_1.extrinsics.translation, cam_1.extrinsics.rotation);
-    // let iso_2 = Isometry3::from_parts(cam_2.extrinsics.translation, cam_2.extrinsics.rotation);
-    // println!("Ground truth motion: {:?}", iso_2.inverse() * iso_1);
+    // Some printing of results.
+    let cam_1 = &multires_camera_1[1];
+    let cam_2 = &multires_camera_2[1];
+    let iso_1 = Isometry3::from_parts(cam_1.extrinsics.translation, cam_1.extrinsics.rotation);
+    let iso_2 = Isometry3::from_parts(cam_2.extrinsics.translation, cam_2.extrinsics.rotation);
+    let iso = iso_2.inverse() * iso_1;
+    println!("------------------------------- results");
+    println!("Computed translation: {:?}", motion.translation.vector);
+    println!("GT       translation: {:?}", iso.translation.vector);
+    println!("Computed rotation: {:?}", motion.rotation);
+    println!("GT       rotation: {:?}", iso.rotation);
 
     // Return motion.
     motion
@@ -156,7 +163,7 @@ fn _step_hessian_levenberg(
         hessian = hessian + jac * jac.transpose();
         rhs = rhs + res * jac;
     }
-    let levenberg_marquardt_coef = 1.5;
+    let levenberg_marquardt_coef = 1.0;
     hessian.m11 = levenberg_marquardt_coef * hessian.m11;
     hessian.m22 = levenberg_marquardt_coef * hessian.m22;
     hessian.m33 = levenberg_marquardt_coef * hessian.m33;
@@ -164,7 +171,7 @@ fn _step_hessian_levenberg(
     hessian.m55 = levenberg_marquardt_coef * hessian.m55;
     hessian.m66 = levenberg_marquardt_coef * hessian.m66;
     let twist_step = hessian.cholesky().unwrap().solve(&rhs);
-    model - 0.1 * twist_step
+    model - 0.05 * twist_step
 }
 
 type Observation<'a> = (
