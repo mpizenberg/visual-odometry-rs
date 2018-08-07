@@ -136,11 +136,9 @@ fn _step_hessian(
     model: &Vector6<f32>,
 ) -> Vector6<f32> {
     let mut hessian: Matrix6<Float> = Matrix6::zeros();
-    for jac in jacobian {
-        hessian = hessian + jac * jac.transpose();
-    }
     let mut rhs: Vector6<Float> = Vector6::zeros();
     for (jac, &res) in jacobian.iter().zip(residuals.iter()) {
+        hessian = hessian + jac * jac.transpose();
         rhs = rhs + res * jac;
     }
     let twist_step = hessian.cholesky().unwrap().solve(&rhs);
