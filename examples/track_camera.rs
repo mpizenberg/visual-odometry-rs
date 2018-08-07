@@ -20,7 +20,7 @@ fn main() {
     let (multires_camera_1, multires_img_1, depth_1) =
         icl_nuim::prepare_data(1, &all_extrinsics).unwrap();
     let (multires_camera_2, multires_img_2, _) =
-        icl_nuim::prepare_data(10, &all_extrinsics).unwrap();
+        icl_nuim::prepare_data(2, &all_extrinsics).unwrap();
     let multires_gradients_1_norm = multires::gradients(&multires_img_1);
     let multires_gradients_2_xy = multires::gradients_xy(&multires_img_2);
     let candidates = candidates::select(&multires_gradients_1_norm)
@@ -82,7 +82,7 @@ fn track(
 
         let (new_twist, _) = optimization::gauss_newton(
             &eval,
-            &_step_hessian,
+            &_step_hessian_levenberg,
             &stop_criterion,
             &(intrinsics, idepth_map, img_1, img_2, gx_2, gy_2),
             twist,
@@ -105,7 +105,7 @@ fn track(
 
 fn stop_criterion(nb_iter: usize, energy: f32, residuals: &Vec<Residual>) -> (f32, Continue) {
     let new_energy: f32 = residuals.iter().map(|x| x.abs()).sum::<f32>() / residuals.len() as f32;
-    println!("energy: {}", new_energy);
+    println!("iter {}, energy: {}", nb_iter, new_energy);
     let continuation = if new_energy > energy {
         Continue::Backward
     } else if nb_iter >= 20 {
@@ -141,6 +141,28 @@ fn _step_hessian(
         hessian = hessian + jac * jac.transpose();
         rhs = rhs + res * jac;
     }
+    let twist_step = hessian.cholesky().unwrap().solve(&rhs);
+    model - 0.1 * twist_step
+}
+
+fn _step_hessian_levenberg(
+    jacobian: &Vec<Jacobian>,
+    residuals: &Vec<Residual>,
+    model: &Vector6<f32>,
+) -> Vector6<f32> {
+    let mut hessian: Matrix6<Float> = Matrix6::zeros();
+    let mut rhs: Vector6<Float> = Vector6::zeros();
+    for (jac, &res) in jacobian.iter().zip(residuals.iter()) {
+        hessian = hessian + jac * jac.transpose();
+        rhs = rhs + res * jac;
+    }
+    let levenberg_marquardt_coef = 1.5;
+    hessian.m11 = levenberg_marquardt_coef * hessian.m11;
+    hessian.m22 = levenberg_marquardt_coef * hessian.m22;
+    hessian.m33 = levenberg_marquardt_coef * hessian.m33;
+    hessian.m44 = levenberg_marquardt_coef * hessian.m44;
+    hessian.m55 = levenberg_marquardt_coef * hessian.m55;
+    hessian.m66 = levenberg_marquardt_coef * hessian.m66;
     let twist_step = hessian.cholesky().unwrap().solve(&rhs);
     model - 0.1 * twist_step
 }
