@@ -12,7 +12,7 @@ use cv::optimization::{self, Continue};
 use cv::se3;
 
 use nalgebra::base::dimension::Dynamic;
-use nalgebra::{DMatrix, DVector, Isometry3, MatrixMN, Point2, Vector6};
+use nalgebra::{DMatrix, DVector, Isometry3, Matrix6, MatrixMN, Point2, Vector6};
 use std::f32::EPSILON;
 
 fn main() {
@@ -82,7 +82,7 @@ fn track(
 
         let (new_twist, _) = optimization::gauss_newton(
             &eval,
-            &step,
+            &_step_hessian,
             &stop_criterion,
             &(intrinsics, idepth_map, img_1, img_2, gx_2, gy_2),
             twist,
@@ -116,13 +116,34 @@ fn stop_criterion(nb_iter: usize, energy: f32, residuals: &Vec<Residual>) -> (f3
     (new_energy, continuation)
 }
 
-fn step(jacobian: &Vec<Jacobian>, residuals: &Vec<Residual>, model: &Vector6<f32>) -> Vector6<f32> {
+fn _step(
+    jacobian: &Vec<Jacobian>,
+    residuals: &Vec<Residual>,
+    model: &Vector6<f32>,
+) -> Vector6<f32> {
     let full_jacobian = MatrixMN::<_, _, Dynamic>::from_columns(jacobian.as_slice());
     let full_residual = DVector::from_column_slice(residuals.len(), residuals.as_slice());
     let twist_step = full_jacobian
         .transpose()
         .svd(true, true)
         .solve(&full_residual, EPSILON);
+    model - 0.1 * twist_step
+}
+
+fn _step_hessian(
+    jacobian: &Vec<Jacobian>,
+    residuals: &Vec<Residual>,
+    model: &Vector6<f32>,
+) -> Vector6<f32> {
+    let mut hessian: Matrix6<Float> = Matrix6::zeros();
+    for jac in jacobian {
+        hessian = hessian + jac * jac.transpose();
+    }
+    let mut rhs: Vector6<Float> = Vector6::zeros();
+    for (jac, &res) in jacobian.iter().zip(residuals.iter()) {
+        rhs = rhs + res * jac;
+    }
+    let twist_step = hessian.cholesky().unwrap().solve(&rhs);
     model - 0.1 * twist_step
 }
 
