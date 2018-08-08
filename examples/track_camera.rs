@@ -279,6 +279,7 @@ fn compute_jacobian(point: Point2<Float>, idepth: Float, f: &Focale, g: Gradient
     )
 
     // Mathematically, we could compute the jacobian like below,
+    // as a product of the gradient and partial derivates,
     // but it's just less efficient to do so:
     //
     // let gradient_transposed = Vector2::new(fx * dx, fy * dy);
