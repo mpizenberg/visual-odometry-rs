@@ -19,25 +19,19 @@ pub type Element = Vector3<Float>;
 // Hat operator.
 // Goes from so3 parameterization to so3 element (skew-symmetric matrix).
 pub fn hat(w: Element) -> Matrix3<Float> {
-    let w1 = w[0];
-    let w2 = w[1];
-    let w3 = w[2];
-    Matrix3::from_column_slice(&[0.0, w3, -w2, -w3, 0.0, w1, w2, -w1, 0.0])
+    Matrix3::new(0.0, -w.z, w.y, w.z, 0.0, -w.x, -w.y, w.x, 0.0)
 }
 
 // Squared hat operator (hat_2(w) == hat(w) * hat(w)).
 // PS: result is a symmetric matrix.
 pub fn hat_2(w: Element) -> Matrix3<Float> {
-    let w1 = w[0];
-    let w2 = w[1];
-    let w3 = w[2];
-    let w11 = w1 * w1;
-    let w12 = w1 * w2;
-    let w22 = w2 * w2;
-    let w23 = w2 * w3;
-    let w33 = w3 * w3;
-    let w13 = w1 * w3;
-    Matrix3::from_column_slice(&[
+    let w11 = w.x * w.x;
+    let w12 = w.x * w.y;
+    let w22 = w.y * w.y;
+    let w23 = w.y * w.z;
+    let w33 = w.z * w.z;
+    let w13 = w.x * w.z;
+    Matrix3::new(
         -w22 - w33,
         w12,
         w13,
@@ -47,14 +41,13 @@ pub fn hat_2(w: Element) -> Matrix3<Float> {
         w13,
         w23,
         -w11 - w22,
-    ])
+    )
 }
 
 // Vee operator. Inverse of hat operator.
 // Warning! does not check that the given matrix is skew-symmetric.
 pub fn vee(mat: Matrix3<Float>) -> Element {
-    // TODO: improve performance.
-    Vector3::from_column_slice(&[mat[(2, 1)], mat[(0, 2)], mat[(1, 0)]])
+    Vector3::new(mat.m32, mat.m13, mat.m21)
 }
 
 // Compute the exponential map from Lie algebra so3 to Lie group SO3.
