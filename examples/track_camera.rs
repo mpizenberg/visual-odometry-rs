@@ -97,14 +97,12 @@ fn track(
     // Some printing of results.
     let cam_1 = &multires_camera_1[1];
     let cam_2 = &multires_camera_2[1];
-    let iso_1 = Isometry3::from_parts(cam_1.extrinsics.translation, cam_1.extrinsics.rotation);
-    let iso_2 = Isometry3::from_parts(cam_2.extrinsics.translation, cam_2.extrinsics.rotation);
-    let iso = iso_2.inverse() * iso_1;
+    let gt_motion = cam_2.extrinsics.inverse() * cam_1.extrinsics;
     println!("------------------------------- results");
     println!("Computed translation: {:?}", motion.translation.vector);
-    println!("GT       translation: {:?}", iso.translation.vector);
+    println!("GT       translation: {:?}", gt_motion.translation.vector);
     println!("Computed rotation: {:?}", motion.rotation);
-    println!("GT       rotation: {:?}", iso.rotation);
+    println!("GT       rotation: {:?}", gt_motion.rotation);
 
     // Return motion.
     motion
