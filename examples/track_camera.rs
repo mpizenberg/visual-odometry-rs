@@ -80,9 +80,9 @@ fn track(
         let idepth_map = &multires_idepth_1[level - 1];
         let (gx_2, gy_2) = &multires_gradients_2[level - 1];
 
-        let (new_twist, _) = optimization::gauss_newton(
+        let (new_twist, _) = optimization::iterative(
             &eval,
-            &_step_hessian_levenberg,
+            &_step_levenberg_marquardt,
             &stop_criterion,
             &(intrinsics, idepth_map, img_1, img_2, gx_2, gy_2),
             twist,
@@ -121,7 +121,7 @@ fn stop_criterion(nb_iter: usize, energy: f32, residuals: &Vec<Residual>) -> (f3
     (new_energy, continuation)
 }
 
-fn _step(
+fn _step_jacobian_svd(
     jacobian: &Vec<Jacobian>,
     residuals: &Vec<Residual>,
     model: &Vector6<f32>,
@@ -135,7 +135,7 @@ fn _step(
     model - 0.1 * twist_step
 }
 
-fn _step_hessian(
+fn _step_hessian_cholesky(
     jacobian: &Vec<Jacobian>,
     residuals: &Vec<Residual>,
     model: &Vector6<f32>,
@@ -150,7 +150,7 @@ fn _step_hessian(
     model - 0.1 * twist_step
 }
 
-fn _step_hessian_levenberg(
+fn _step_levenberg_marquardt(
     jacobian: &Vec<Jacobian>,
     residuals: &Vec<Residual>,
     model: &Vector6<f32>,

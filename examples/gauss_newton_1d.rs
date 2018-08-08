@@ -31,7 +31,7 @@ fn main() {
         let residual = f_model - observation;
         (jacobian, residual)
     };
-    let step = |jacobian: &DVector<f32>, residual: &DVector<f32>, model: &f32| {
+    let step_gauss_newton = |jacobian: &DVector<f32>, residual: &DVector<f32>, model: &f32| {
         println!("a_n: {}", model);
         let gradient = 2.0 * jacobian.component_mul(residual).iter().sum::<f32>();
         let hessian = 2.0 * jacobian.norm_squared();
@@ -48,7 +48,8 @@ fn main() {
         (new_energy, continuation)
     };
 
-    let (model, _) = optimization::gauss_newton(eval, step, stop_criterion, &data_noise, 0.0);
+    let (model, _) =
+        optimization::iterative(eval, step_gauss_newton, stop_criterion, &data_noise, 0.0);
     println!("a: {}", model);
 }
 

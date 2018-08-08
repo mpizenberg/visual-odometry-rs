@@ -53,9 +53,9 @@ fn main() {
         (jacobian, residual)
     };
 
-    let step = |jacobian: &MatrixMN<f32, na::Dynamic, na::U2>,
-                residual: &DVector<f32>,
-                model: &Vector2<f32>| {
+    let step_gauss_newton = |jacobian: &MatrixMN<f32, na::Dynamic, na::U2>,
+                             residual: &DVector<f32>,
+                             model: &Vector2<f32>| {
         println!("(a_n, b_n): ({}, {})", model[0], model[1]);
         model - jacobian.clone().svd(true, true).solve(residual, EPSILON)
     };
@@ -70,9 +70,9 @@ fn main() {
         (new_energy, continuation)
     };
 
-    let _ = optimization::gauss_newton(
+    let _ = optimization::iterative(
         eval,
-        step,
+        step_gauss_newton,
         stop_criterion,
         &data_noise,
         Vector2::new(5.0, 1.0),

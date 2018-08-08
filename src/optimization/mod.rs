@@ -53,17 +53,7 @@ pub fn reprojection_error(
     reprojection_error_accum / total_count as f32
 }
 
-// pub fn gauss_newton<Observation, Model, Jacobian, Residual, Energy>(
-//     eval: fn(&Observation, &Model) -> (Jacobian, Residual),
-//     step: fn(&Jacobian, &Residual, &Model) -> Model,
-//     stop_criterion: fn(usize, Energy, &Residual) -> (Energy, bool),
-//     observation: &Observation,
-//     initial_model: Model,
-// ) -> (Model, usize) {
-//     (initial_model, 0)
-// }
-
-pub fn gauss_newton<Observation, Model, Jacobian, Residual, EvalFn, StepFn, CriterionFn>(
+pub fn iterative<Observation, Model, Derivatives, Residual, EvalFn, StepFn, CriterionFn>(
     eval: EvalFn,
     step: StepFn,
     stop_criterion: CriterionFn,
@@ -71,15 +61,15 @@ pub fn gauss_newton<Observation, Model, Jacobian, Residual, EvalFn, StepFn, Crit
     initial_model: Model,
 ) -> (Model, usize)
 where
-    EvalFn: Fn(&Observation, &Model) -> (Jacobian, Residual),
-    StepFn: Fn(&Jacobian, &Residual, &Model) -> Model,
+    EvalFn: Fn(&Observation, &Model) -> (Derivatives, Residual),
+    StepFn: Fn(&Derivatives, &Residual, &Model) -> Model,
     CriterionFn: Fn(usize, f32, &Residual) -> (f32, Continue),
 {
     // Manual first iteration enable avoiding to have Clone for model.
     // Otherwise, the compiler doesn't know if previous_model has
     // been initialized in the backward branch.
     let mut energy = f32::INFINITY;
-    let (mut jacobian, mut residual) = eval(observation, &initial_model);
+    let (mut derivatives, mut residual) = eval(observation, &initial_model);
     match stop_criterion(0, energy, &residual) {
         (new_energy, Continue::Forward) => {
             energy = new_energy;
@@ -87,10 +77,10 @@ where
         _ => return (initial_model, 0),
     }
     let mut nb_iter = 1;
-    let mut model = step(&jacobian, &residual, &initial_model);
+    let mut model = step(&derivatives, &residual, &initial_model);
     let mut previous_model = initial_model;
-    let (new_jacobian, new_residual) = eval(observation, &model);
-    jacobian = new_jacobian;
+    let (new_derivatives, new_residual) = eval(observation, &model);
+    derivatives = new_derivatives;
     residual = new_residual;
 
     // After first iteration, loop until stop criterion.
@@ -106,9 +96,9 @@ where
                 nb_iter = nb_iter + 1;
                 energy = new_energy;
                 previous_model = model;
-                model = step(&jacobian, &residual, &previous_model);
-                let (new_jacobian, new_residual) = eval(observation, &model);
-                jacobian = new_jacobian;
+                model = step(&derivatives, &residual, &previous_model);
+                let (new_derivatives, new_residual) = eval(observation, &model);
+                derivatives = new_derivatives;
                 residual = new_residual;
             }
         }
