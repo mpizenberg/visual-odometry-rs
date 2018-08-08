@@ -2,7 +2,7 @@ extern crate computer_vision_rs as cv;
 extern crate nalgebra;
 
 use cv::camera::{Camera, Extrinsics, Float, Intrinsics};
-use nalgebra::{Isometry3, Point2, Point3, Quaternion, Translation3, UnitQuaternion};
+use nalgebra::{Point2, Quaternion, Translation3, UnitQuaternion};
 
 fn main() {
     // Camera intrinsics.
@@ -16,29 +16,15 @@ fn main() {
     // Camera at frame 1.
     let translation_1 = Translation3::new(0.0, 0.0, -2.25);
     let rotation_1 = UnitQuaternion::from_quaternion(Quaternion::new(1.0, 0.0, 0.0, 0.0));
-    let extrinsics_1 = Extrinsics::new(translation_1, rotation_1);
+    let extrinsics_1 = Extrinsics::from_parts(translation_1, rotation_1);
     let camera_1 = Camera::new(intrinsics.clone(), extrinsics_1);
 
     // Camera at frame 600.
     let translation_600 = Translation3::new(0.310245, -0.43235, -1.48106);
     let rotation_600 =
         UnitQuaternion::from_quaternion(Quaternion::new(0.933403, 0.0471923, 0.322162, 0.150811));
-    let extrinsics_600 = Extrinsics::new(translation_600, rotation_600);
+    let extrinsics_600 = Extrinsics::from_parts(translation_600, rotation_600);
     let camera_600 = Camera::new(intrinsics.clone(), extrinsics_600);
-
-    // Example showing that Extrinsics is similar to nalgebra Isometry type.
-    let iso_600 = Isometry3::from_parts(translation_600, rotation_600);
-    println!("iso {}", iso_600 * Point3::new(1.0, 2.0, 3.0));
-    println!(
-        "project {}",
-        camera_600.extrinsics.project(Point3::new(1.0, 2.0, 3.0))
-    );
-    println!(
-        "back project {}",
-        camera_600
-            .extrinsics
-            .back_project(Point3::new(1.0, 2.0, 3.0))
-    );
 
     // Bottom left picture frame corner in frame 1.
     let bl_pos_1 = Point2::new(386.0, 277.0);
@@ -76,11 +62,9 @@ fn main() {
 
     // At half resolution.
     println!("\nHalf resolution:");
-    let bl_pos_1_half = 0.5 * bl_pos_1;
-    let bl_pos_600_half = 0.5 * bl_pos_600;
     same_3d_back_projected(
-        (bl_pos_1_half, bl_depth_1),
-        (bl_pos_600_half, bl_depth_600),
+        (0.5 * bl_pos_1, bl_depth_1),
+        (0.5 * bl_pos_600, bl_depth_600),
         &camera_1.half_res(),
         &camera_600.half_res(),
     );

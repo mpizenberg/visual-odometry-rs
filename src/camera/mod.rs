@@ -1,7 +1,4 @@
-use nalgebra::{Affine2, Matrix3, Point2, Point3, Quaternion, Translation3, UnitQuaternion, Vector3};
-use std::fs::File;
-use std::io;
-use std::io::prelude::Read;
+use nalgebra::{Affine2, Isometry3, Matrix3, Point2, Point3, Vector3};
 
 pub type Float = f32;
 
@@ -20,12 +17,12 @@ impl Camera {
     }
 
     pub fn project(&self, point: Point3<Float>) -> Vector3<Float> {
-        self.intrinsics.project(self.extrinsics.project(point))
+        self.intrinsics
+            .project(extrinsics::project(&self.extrinsics, point))
     }
 
     pub fn back_project(&self, point: Point2<Float>, depth: Float) -> Point3<Float> {
-        self.extrinsics
-            .back_project(self.intrinsics.back_project(point, depth))
+        extrinsics::back_project(&self.extrinsics, self.intrinsics.back_project(point, depth))
     }
 
     pub fn multi_res(self, n: usize) -> Vec<Camera> {
@@ -44,36 +41,29 @@ impl Camera {
 
 // EXTRINSICS ##############################################
 
-#[derive(PartialEq, Debug, Clone)]
-pub struct Extrinsics {
-    pub translation: Translation3<Float>,
-    pub rotation: UnitQuaternion<Float>,
-}
+pub type Extrinsics = Isometry3<Float>;
 
-impl Extrinsics {
-    pub fn new(translation: Translation3<Float>, rotation: UnitQuaternion<Float>) -> Extrinsics {
-        Extrinsics {
-            translation,
-            rotation,
-        }
+pub mod extrinsics {
+    use super::{Extrinsics, Float};
+    use nalgebra::{Isometry3, Point3, Quaternion, Translation3, UnitQuaternion};
+    use std::fs::File;
+    use std::io;
+    use std::io::prelude::Read;
+
+    pub fn from_parts(
+        translation: Translation3<Float>,
+        rotation: UnitQuaternion<Float>,
+    ) -> Extrinsics {
+        Isometry3::from_parts(translation, rotation)
     }
 
-    pub fn project(&self, point: Point3<Float>) -> Point3<Float> {
-        self.rotation.inverse() * (self.translation.inverse() * point)
+    pub fn project(motion: &Extrinsics, point: Point3<Float>) -> Point3<Float> {
+        motion.rotation.inverse() * (motion.translation.inverse() * point)
     }
 
-    pub fn back_project(&self, point: Point3<Float>) -> Point3<Float> {
-        self.translation * (self.rotation * point)
+    pub fn back_project(motion: &Extrinsics, point: Point3<Float>) -> Point3<Float> {
+        motion * point
     }
-
-    // pub fn in_coordinates_of(&self, other: &Extrinsics) -> Extrinsics {
-    //     Extrinsics {
-    //         translation: (other.rotation.inverse()
-    //             * (self.translation * other.translation.inverse()))
-    //             .translation,
-    //         rotation: other.rotation.inverse() * self.rotation,
-    //     }
-    // }
 
     pub fn read_from_tum_file(file_path: &str) -> Result<Vec<Extrinsics>, io::Error> {
         let mut file_content = String::new();
@@ -89,7 +79,7 @@ impl Extrinsics {
                 values[5],
                 values[6],
             ));
-            extrinsics.push(Extrinsics::new(translation, rotation));
+            extrinsics.push(from_parts(translation, rotation));
         }
         Ok(extrinsics)
     }

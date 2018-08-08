@@ -2,7 +2,7 @@ extern crate computer_vision_rs as cv;
 extern crate image;
 extern crate nalgebra;
 
-use cv::camera::{Camera, Extrinsics};
+use cv::camera::{self, Camera};
 use cv::candidates;
 use cv::helper;
 use cv::icl_nuim;
@@ -14,7 +14,7 @@ use nalgebra::DMatrix;
 
 // #[allow(dead_code)]
 fn main() {
-    let all_extrinsics = Extrinsics::read_from_tum_file("data/trajectory-gt.txt").unwrap();
+    let all_extrinsics = camera::extrinsics::read_from_tum_file("data/trajectory-gt.txt").unwrap();
     let (multires_camera_1, multires_rgb_1, depth_1) =
         icl_nuim::prepare_data(1, &all_extrinsics).unwrap();
     let (multires_camera_2, multires_rgb_2, _) =

@@ -2,7 +2,7 @@ extern crate computer_vision_rs as cv;
 extern crate image;
 extern crate nalgebra;
 
-use cv::camera::{Camera, Extrinsics, Intrinsics};
+use cv::camera::{self, Camera, Intrinsics};
 use cv::candidates;
 use cv::helper;
 use cv::icl_nuim;
@@ -16,7 +16,7 @@ use nalgebra::{DMatrix, DVector, Isometry3, Matrix6, MatrixMN, Point2, Vector6};
 use std::f32::EPSILON;
 
 fn main() {
-    let all_extrinsics = Extrinsics::read_from_tum_file("data/trajectory-gt.txt").unwrap();
+    let all_extrinsics = camera::extrinsics::read_from_tum_file("data/trajectory-gt.txt").unwrap();
     let (multires_camera_1, multires_img_1, depth_1) =
         icl_nuim::prepare_data(1, &all_extrinsics).unwrap();
     let (multires_camera_2, multires_img_2, _) =
