@@ -31,16 +31,11 @@ pub fn hat_2(w: Element) -> Matrix3<Float> {
     let w23 = w.y * w.z;
     let w33 = w.z * w.z;
     let w13 = w.x * w.z;
+    #[cfg_attr(rustfmt, rustfmt_skip)]
     Matrix3::new(
-        -w22 - w33,
-        w12,
-        w13,
-        w12,
-        -w11 - w33,
-        w23,
-        w13,
-        w23,
-        -w11 - w22,
+        -w22 - w33,     w12,           w13,
+         w12,          -w11 - w33,     w23,
+         w13,           w23,          -w11 - w22,
     )
 }
 

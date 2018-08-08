@@ -97,16 +97,11 @@ pub struct Intrinsics {
 
 impl Intrinsics {
     pub fn matrix(&self) -> Affine2<Float> {
+        #[cfg_attr(rustfmt, rustfmt_skip)]
         Affine2::from_matrix_unchecked(Matrix3::new(
-            self.focal_length * self.scaling.0,
-            self.skew,
-            self.principal_point.0,
-            0.0,
-            self.focal_length * self.scaling.1,
-            self.principal_point.1,
-            0.0,
-            0.0,
-            1.0,
+            self.focal_length * self.scaling.0, self.skew, self.principal_point.0,
+            0.0, self.focal_length * self.scaling.1,       self.principal_point.1,
+            0.0, 0.0, 1.0,
         ))
     }
 
@@ -150,5 +145,3 @@ impl Intrinsics {
         Point3::new(x, y, z)
     }
 }
-
-// FUNCTIONS ###############################################
