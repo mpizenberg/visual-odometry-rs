@@ -6,6 +6,7 @@ use cv::camera::{self, Camera, Intrinsics};
 use cv::candidates;
 use cv::helper;
 use cv::icl_nuim;
+use cv::interop;
 use cv::inverse_depth::{self, InverseDepth};
 use cv::multires;
 use cv::optimization::{self, Continue};
@@ -20,7 +21,7 @@ fn main() {
     let (multires_camera_1, multires_img_1, depth_1) =
         icl_nuim::prepare_data(1, &all_extrinsics).unwrap();
     let (multires_camera_2, multires_img_2, _) =
-        icl_nuim::prepare_data(2, &all_extrinsics).unwrap();
+        icl_nuim::prepare_data(20, &all_extrinsics).unwrap();
     let multires_gradients_1_norm = multires::gradients(&multires_img_1);
     let multires_gradients_2_xy = multires::gradients_xy(&multires_img_2);
     let candidates = candidates::select(&multires_gradients_1_norm)
@@ -69,26 +70,28 @@ fn track(
     //         * (6) Update (recompute) the residuals
 
     let mut motion = Isometry3::identity();
-    let mut twist = se3::to_vector(se3::log(motion));
     for level in (1..6).rev() {
         println!("--- level {}", level);
         let cam_1 = &multires_camera_1[level];
         let cam_2 = &multires_camera_2[level];
         let intrinsics = &cam_1.intrinsics;
         let img_1 = &multires_img_1[level];
+        let img_1_name = &["out/lvl_", level.to_string().as_str(), "_1.png"].concat();
+        interop::image_from_matrix(&img_1).save(img_1_name).unwrap();
         let img_2 = &multires_img_2[level];
+        let img_2_name = &["out/lvl_", level.to_string().as_str(), "_2.png"].concat();
+        interop::image_from_matrix(&img_2).save(img_2_name).unwrap();
         let idepth_map = &multires_idepth_1[level - 1];
         let (gx_2, gy_2) = &multires_gradients_2[level - 1];
 
-        let (new_twist, _) = optimization::iterative(
+        let (new_motion, _) = optimization::iterative(
             &eval,
             &_step_levenberg_marquardt,
             &stop_criterion,
             &(intrinsics, idepth_map, img_1, img_2, gx_2, gy_2),
-            twist,
+            motion,
         );
-        twist = new_twist;
-        motion = se3::exp(se3::from_vector(twist));
+        motion = new_motion;
         // Some ground truth logging.
         let gt_energy = optimization::reprojection_error(idepth_map, cam_1, cam_2, img_1, img_2);
         println!("GT energy: {}", gt_energy);
@@ -153,23 +156,28 @@ fn _step_hessian_cholesky(
 fn _step_levenberg_marquardt(
     jacobian: &Vec<Jacobian>,
     residuals: &Vec<Residual>,
-    model: &Vector6<f32>,
-) -> Vector6<f32> {
+    motion: &Isometry3<f32>,
+) -> Isometry3<f32> {
     let mut hessian: Matrix6<Float> = Matrix6::zeros();
     let mut rhs: Vector6<Float> = Vector6::zeros();
     for (jac, &res) in jacobian.iter().zip(residuals.iter()) {
         hessian = hessian + jac * jac.transpose();
         rhs = rhs + res * jac;
     }
-    let levenberg_marquardt_coef = 1.0;
+    // let mean_coef = 1.0 / jacobian.len() as f32;
+    // hessian = mean_coef * hessian;
+    // rhs = mean_coef * rhs;
+    let levenberg_marquardt_coef = 1.2;
     hessian.m11 = levenberg_marquardt_coef * hessian.m11;
     hessian.m22 = levenberg_marquardt_coef * hessian.m22;
     hessian.m33 = levenberg_marquardt_coef * hessian.m33;
     hessian.m44 = levenberg_marquardt_coef * hessian.m44;
     hessian.m55 = levenberg_marquardt_coef * hessian.m55;
     hessian.m66 = levenberg_marquardt_coef * hessian.m66;
-    let twist_step = hessian.cholesky().unwrap().solve(&rhs);
-    model - 0.05 * twist_step
+    let twist_step = 1.0 * hessian.cholesky().unwrap().solve(&(-rhs));
+    let new_motion = se3::exp(se3::from_vector(twist_step)) * motion;
+    println!("Computed translation: {:?}", new_motion.translation.vector);
+    new_motion
 }
 
 type Observation<'a> = (
@@ -181,12 +189,11 @@ type Observation<'a> = (
     &'a DMatrix<i16>,
 );
 
-fn eval(observation: &Observation, model: &Vector6<f32>) -> (Vec<Jacobian>, Vec<Residual>) {
+fn eval(observation: &Observation, motion: &Isometry3<f32>) -> (Vec<Jacobian>, Vec<Residual>) {
     let (intrinsics, idepth_map, img_1, img_2, gx_2, gy_2) = observation;
     let mut all_jacobians = Vec::new();
     let mut all_residuals = Vec::new();
     let (nrows, ncols) = idepth_map.shape();
-    let motion = se3::exp(se3::from_vector(*model));
     let (f, (sx, sy)) = (intrinsics.focal_length, intrinsics.scaling);
     let focale = Focale(f * sx, f * sy);
     let eval_at = |point, idepth, color_ref| {
@@ -197,7 +204,7 @@ fn eval(observation: &Observation, model: &Vector6<f32>) -> (Vec<Jacobian>, Vec<
             // nb_candidates += 1;
             let (col, row) = helper::div_rem(index, nrows);
             let point = Point2::new(col as f32, row as f32);
-            let (reprojected, new_idepth) = reproject(point, *idepth, intrinsics, &motion);
+            let (reprojected, new_idepth) = reproject(point, *idepth, intrinsics, motion);
             if helper::in_image_bounds((reprojected[0], reprojected[1]), (nrows, ncols)) {
                 // nb_in_frame += 1;
                 let color_ref = img_1[(row, col)];
@@ -242,9 +249,9 @@ fn jacobian_at(
     img_origin_pixel: u8,
 ) -> (Jacobian, Residual) {
     let (indices, coefs) = optimization::linear_interpolator(point);
-    let gx2_xy = optimization::interpolate_with(indices, coefs, gradient_x);
-    let gy2_xy = optimization::interpolate_with(indices, coefs, gradient_y);
-    let gradient = Gradient(gx2_xy, gy2_xy);
+    let g_x = optimization::interpolate_with(indices, coefs, gradient_x);
+    let g_y = optimization::interpolate_with(indices, coefs, gradient_y);
+    let gradient = Gradient(g_x, g_y);
     let img_xy = optimization::interpolate_with(indices, coefs, img);
     let residual = img_xy - img_origin_pixel as f32;
     (compute_jacobian(point, idepth, focale, gradient), residual)
