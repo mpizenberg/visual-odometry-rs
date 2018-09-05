@@ -45,10 +45,7 @@ pub type Extrinsics = Isometry3<Float>;
 
 pub mod extrinsics {
     use super::{Extrinsics, Float};
-    use nalgebra::{Isometry3, Point3, Quaternion, Translation3, UnitQuaternion};
-    use std::fs::File;
-    use std::io;
-    use std::io::prelude::Read;
+    use nalgebra::{Isometry3, Point3, Translation3, UnitQuaternion};
 
     pub fn from_parts(
         translation: Translation3<Float>,
@@ -63,25 +60,6 @@ pub mod extrinsics {
 
     pub fn back_project(motion: &Extrinsics, point: Point3<Float>) -> Point3<Float> {
         motion * point
-    }
-
-    pub fn read_from_tum_file(file_path: &str) -> Result<Vec<Extrinsics>, io::Error> {
-        let mut file_content = String::new();
-        File::open(file_path)?.read_to_string(&mut file_content)?;
-        let mut extrinsics = Vec::new();
-        for line in file_content.lines() {
-            let values: Vec<Float> = line.split(' ').filter_map(|s| s.parse().ok()).collect();
-            assert_eq!(8, values.len(), "There was an issue in parsing:\n{}", line);
-            let translation = Translation3::new(values[1], values[2], values[3]);
-            let rotation = UnitQuaternion::from_quaternion(Quaternion::new(
-                values[7],
-                values[4],
-                values[5],
-                values[6],
-            ));
-            extrinsics.push(from_parts(translation, rotation));
-        }
-        Ok(extrinsics)
     }
 }
 
@@ -130,7 +108,8 @@ impl Intrinsics {
 
     pub fn project(&self, point: Point3<Float>) -> Vector3<Float> {
         Vector3::new(
-            self.focal_length * self.scaling.0 * point[0] + self.skew * point[1]
+            self.focal_length * self.scaling.0 * point[0]
+                + self.skew * point[1]
                 + self.principal_point.0 * point[2],
             self.focal_length * self.scaling.1 * point[1] + self.principal_point.1 * point[2],
             point[2],

@@ -13,6 +13,7 @@ pub mod icl_nuim;
 pub mod interop;
 pub mod inverse_depth;
 pub mod multires;
+pub mod multires_float;
 pub mod optimization;
 pub mod se3;
 pub mod so3;

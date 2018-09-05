@@ -2,6 +2,7 @@ use nalgebra::{DMatrix, Scalar};
 
 pub type Float = f32;
 
+// Same as pyramid but limits the max number of levels.
 pub fn pyramid_with_max_n_levels<I, F, T, U>(
     levels: usize,
     mat: DMatrix<T>,
@@ -26,23 +27,8 @@ where
     pyramid(mat, init, new_f)
 }
 
-pub fn mean_pyramid(max_levels: usize, mat: DMatrix<u8>) -> Vec<DMatrix<u8>> {
-    pyramid_with_max_n_levels(
-        max_levels,
-        mat,
-        |m| m,
-        |m| {
-            halve(m, |a, b, c, d| {
-                let a = a as u16;
-                let b = b as u16;
-                let c = c as u16;
-                let d = d as u16;
-                ((a + b + c + d) / 4) as u8
-            })
-        },
-    )
-}
-
+// Half the resolution with the given function until it returns None.
+// Consumes the matrix since we have an "equivalent" at the beginning of the pyramid.
 pub fn pyramid<I, F, T, U>(mat: DMatrix<T>, init: I, mut f: F) -> Vec<DMatrix<U>>
 where
     I: Fn(DMatrix<T>) -> DMatrix<U>,
@@ -56,6 +42,32 @@ where
         pyr.push(half_res);
     }
     pyr
+}
+
+// pub struct MultiResIter<F>
+// where
+//     F: FnMut(DMatrix<Float>) -> Option<DMatrix<Float>>,
+// {
+//     matrix: DMatrix<Float>,
+//     next: F,
+//     index: usize,
+// }
+//
+//
+// impl Iterator for MultiRes {
+//     type Item = DMatrix<Float>;
+//     fn next(&mut self) -> Option<DMatrix<Float>> {
+//         match self.index {
+//             0 => {Some(self.matrix)}
+//         }
+
+pub fn mean_pyramid(max_levels: usize, mat: DMatrix<u8>) -> Vec<DMatrix<Float>> {
+    pyramid_with_max_n_levels(
+        max_levels,
+        mat,
+        |m| m.map(|x| x as Float / 255.0),
+        |m| halve(m, |a, b, c, d| (a + b + c + d) / 4.0),
+    )
 }
 
 pub fn halve<F, T, U>(mat: &DMatrix<T>, f: F) -> Option<DMatrix<U>>
@@ -83,7 +95,7 @@ where
 
 // Gradients stuff ###################################################
 
-pub fn gradients(multires_mat: &Vec<DMatrix<u8>>) -> Vec<DMatrix<u16>> {
+pub fn gradients(multires_mat: &Vec<DMatrix<Float>>) -> Vec<DMatrix<Float>> {
     let nb_levels = multires_mat.len();
     multires_mat
         .iter()
@@ -92,7 +104,7 @@ pub fn gradients(multires_mat: &Vec<DMatrix<u8>>) -> Vec<DMatrix<u16>> {
         .collect()
 }
 
-pub fn gradients_xy(multires_mat: &Vec<DMatrix<u8>>) -> Vec<(DMatrix<i16>, DMatrix<i16>)> {
+pub fn gradients_xy(multires_mat: &Vec<DMatrix<Float>>) -> Vec<(DMatrix<Float>, DMatrix<Float>)> {
     let nb_levels = multires_mat.len();
     multires_mat
         .iter()
@@ -106,29 +118,16 @@ pub fn gradients_xy(multires_mat: &Vec<DMatrix<u8>>) -> Vec<(DMatrix<i16>, DMatr
         .collect()
 }
 
-pub fn gradient_x(a: u8, b: u8, c: u8, d: u8) -> i16 {
-    let a = a as i16;
-    let b = b as i16;
-    let c = c as i16;
-    let d = d as i16;
-    (c + d - a - b) / 2
+pub fn gradient_x(a: Float, b: Float, c: Float, d: Float) -> Float {
+    (c + d - a - b) / 2.0
 }
 
-pub fn gradient_y(a: u8, b: u8, c: u8, d: u8) -> i16 {
-    let a = a as i16;
-    let b = b as i16;
-    let c = c as i16;
-    let d = d as i16;
-    (b - a + d - c) / 2
+pub fn gradient_y(a: Float, b: Float, c: Float, d: Float) -> Float {
+    (b - a + d - c) / 2.0
 }
 
-fn gradient_squared_norm(a: u8, b: u8, c: u8, d: u8) -> u16 {
-    let a = a as i32;
-    let b = b as i32;
-    let c = c as i32;
-    let d = d as i32;
+fn gradient_squared_norm(a: Float, b: Float, c: Float, d: Float) -> Float {
     let dx = c + d - a - b;
     let dy = b - a + d - c;
-    // I have checked that the max value is in u16.
-    ((dx * dx + dy * dy) / 4) as u16
+    (dx * dx + dy * dy) / 4.0
 }

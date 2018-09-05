@@ -1,12 +1,15 @@
 use nalgebra::DMatrix;
 
+pub type Float = f32;
+
 // Select a subset of points satisfying two conditions:
 //   * points shall be well-distributed in the image.
 //   * higher density where gradients are bigger.
-pub fn select(gradients: &Vec<DMatrix<u16>>) -> Vec<DMatrix<bool>> {
+pub fn select(diff_threshold: Float, gradients: &Vec<DMatrix<Float>>) -> Vec<DMatrix<bool>> {
     let (nrows, ncols) = gradients.last().unwrap().shape();
     let mut init_candidates = Vec::new();
     init_candidates.push(DMatrix::repeat(nrows, ncols, true));
+    let prune = |a, b, c, d| prune_with_thresh(diff_threshold, a, b, c, d);
     gradients
         .iter()
         .rev() // start with lower res
@@ -19,10 +22,10 @@ pub fn select(gradients: &Vec<DMatrix<u16>>) -> Vec<DMatrix<bool>> {
 }
 
 // Apply a predicate function on each 2x2 bloc.
-// Only evaluate the function on authorized blocs by half res pre_mask.
-fn select_2x2_bloc<F>(pre_mask: &DMatrix<bool>, mat: &DMatrix<u16>, f: F) -> DMatrix<bool>
+// Only evaluate the function in selected blocs in half res pre_mask.
+fn select_2x2_bloc<F>(pre_mask: &DMatrix<bool>, mat: &DMatrix<Float>, f: F) -> DMatrix<bool>
 where
-    F: Fn(u16, u16, u16, u16) -> [bool; 4],
+    F: Fn(Float, Float, Float, Float) -> [bool; 4],
 {
     let (nrows, ncols) = mat.shape();
     let (nrows_2, ncols_2) = pre_mask.shape();
@@ -54,10 +57,10 @@ where
 //     ( 0, 1, 8, 9 ) -> [ false, false, true, true ]
 //     ( 0, 9, 1, 8 ) -> [ false, true, false, true ]
 //     ( 1, 0, 9, 0 ) -> [ false, false, true, false ]
-fn prune(a: u16, b: u16, c: u16, d: u16) -> [bool; 4] {
-    let thresh = 7;
+fn prune_with_thresh(thresh: Float, a: Float, b: Float, c: Float, d: Float) -> [bool; 4] {
+    // let thresh = 7.0 / 255.0;
     let mut temp = [(a, 0usize), (b, 1usize), (c, 2usize), (d, 3usize)];
-    temp.sort_unstable_by(|(x, _), (y, _)| x.cmp(y));
+    temp.sort_unstable_by(|(x, _), (y, _)| x.partial_cmp(y).unwrap());
     let (_, first) = temp[3];
     let (x, second) = temp[2];
     let (y, _) = temp[1];
