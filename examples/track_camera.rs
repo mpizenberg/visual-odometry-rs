@@ -94,7 +94,7 @@ fn track(
         motion = new_motion;
         // Some ground truth logging.
         let gt_energy = optimization::reprojection_error(idepth_map, cam_1, cam_2, img_1, img_2);
-        println!("GT energy: {}", gt_energy);
+        // println!("GT energy: {}", gt_energy);
     }
 
     // Some printing of results.
@@ -116,7 +116,7 @@ fn stop_criterion(nb_iter: usize, energy: f32, residuals: &Vec<Residual>) -> (f3
     println!("iter {}, energy: {}", nb_iter, new_energy);
     let continuation = if new_energy > energy {
         Continue::Backward
-    } else if nb_iter >= 20 {
+    } else if nb_iter >= 50 {
         Continue::Stop
     } else {
         Continue::Forward
@@ -127,15 +127,17 @@ fn stop_criterion(nb_iter: usize, energy: f32, residuals: &Vec<Residual>) -> (f3
 fn _step_jacobian_svd(
     jacobian: &Vec<Jacobian>,
     residuals: &Vec<Residual>,
-    model: &Vector6<f32>,
-) -> Vector6<f32> {
+    motion: &Isometry3<f32>,
+) -> Isometry3<f32> {
     let full_jacobian = MatrixMN::<_, _, Dynamic>::from_columns(jacobian.as_slice());
     let full_residual = DVector::from_column_slice(residuals.len(), residuals.as_slice());
     let twist_step = full_jacobian
         .transpose()
         .svd(true, true)
-        .solve(&full_residual, EPSILON);
-    model - 0.1 * twist_step
+        .solve(&(-full_residual), EPSILON);
+    let new_motion = se3::exp(se3::from_vector(twist_step)) * motion;
+    // println!("Computed translation: {:?}", new_motion.translation.vector);
+    new_motion
 }
 
 fn _step_hessian_cholesky(
@@ -160,13 +162,50 @@ fn _step_levenberg_marquardt(
 ) -> Isometry3<f32> {
     let mut hessian: Matrix6<Float> = Matrix6::zeros();
     let mut rhs: Vector6<Float> = Vector6::zeros();
+    let mean_coef = 1.0 / jacobian.len() as f32;
+    println!("nb points: {}", jacobian.len());
+
+    // ----- debug
+    let full_jacobian = MatrixMN::<_, _, Dynamic>::from_columns(jacobian.as_slice());
+    let full_jacobian_64 = full_jacobian.map(|x| x as f64);
+    println!("Size Jac: {:?}", full_jacobian.shape());
+    let singular_values = full_jacobian.clone().singular_values();
+    let singular_values_64 = full_jacobian_64.clone().singular_values();
+    println!("Singular values Jac: {:?}", singular_values.data.data());
+    println!(
+        "Singular values Jac (64): {:?}",
+        singular_values_64.data.data()
+    );
+    let jac_jac_t = full_jacobian.clone() * full_jacobian.transpose();
+    let jac_jac_t_64 = full_jacobian_64.clone() * full_jacobian_64.transpose();
+    // println!("Jac * JacT: {}", jac_jac_t / 100000000.0);
+    let eigen_values = jac_jac_t.eigenvalues().unwrap();
+    let eigen_values_64 = jac_jac_t_64.eigenvalues().unwrap();
+    // .map(|x| x.sqrt());
+    println!(
+        "Eigenvalues Jac * JacT: {:?}",
+        (eigen_values / 10000000000.0).data
+    );
+    println!("Eigenvalues Jac * JacT (64): {:?}", (eigen_values_64).data);
+    // ----- end debug
+
     for (jac, &res) in jacobian.iter().zip(residuals.iter()) {
+        // println!("jacobian: {:?}", jac.data);
         hessian = hessian + jac * jac.transpose();
         rhs = rhs + res * jac;
     }
-    // let mean_coef = 1.0 / jacobian.len() as f32;
-    // hessian = mean_coef * hessian;
-    // rhs = mean_coef * rhs;
+
+    // Scale changement do not change cholesky decomposition in theory
+    // but may avoid overflowing max f32 values (3.402823 * 10^38)
+    hessian = mean_coef * hessian;
+    rhs = mean_coef * rhs;
+    // println!("hessian: {}", &hessian);
+    // println!("rhs: {}", &rhs);
+
+    // SVD to check condition number
+    let singular_values = hessian.singular_values();
+    // println!("Singular values hessian: {:?}", singular_values.data);
+
     let levenberg_marquardt_coef = 1.2;
     hessian.m11 = levenberg_marquardt_coef * hessian.m11;
     hessian.m22 = levenberg_marquardt_coef * hessian.m22;
@@ -175,8 +214,9 @@ fn _step_levenberg_marquardt(
     hessian.m55 = levenberg_marquardt_coef * hessian.m55;
     hessian.m66 = levenberg_marquardt_coef * hessian.m66;
     let twist_step = 1.0 * hessian.cholesky().unwrap().solve(&(-rhs));
+    // println!("twist_step: {}", &twist_step);
     let new_motion = se3::exp(se3::from_vector(twist_step)) * motion;
-    println!("Computed translation: {:?}", new_motion.translation.vector);
+    // println!("Computed translation: {:?}", new_motion.translation.vector);
     new_motion
 }
 
