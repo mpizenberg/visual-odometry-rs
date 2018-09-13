@@ -1,4 +1,5 @@
 extern crate computer_vision_rs as cv;
+extern crate csv;
 extern crate image;
 extern crate nalgebra;
 
@@ -15,13 +16,14 @@ use cv::se3;
 use nalgebra::base::dimension::Dynamic;
 use nalgebra::{DMatrix, DVector, Isometry3, Matrix6, MatrixMN, Point2, Vector6};
 use std::f32::EPSILON;
+use std::iter;
 
 fn main() {
     let all_extrinsics = icl_nuim::read_extrinsics("data/trajectory-gt.txt").unwrap();
     let (multires_camera_1, multires_img_1, depth_1) =
-        icl_nuim::prepare_data(1, &all_extrinsics).unwrap();
+        icl_nuim::prepare_data(650, &all_extrinsics).unwrap();
     let (multires_camera_2, multires_img_2, _) =
-        icl_nuim::prepare_data(20, &all_extrinsics).unwrap();
+        icl_nuim::prepare_data(670, &all_extrinsics).unwrap();
     let multires_gradients_1_norm = multires_float::gradients(&multires_img_1);
     let multires_gradients_2_xy = multires_float::gradients_xy(&multires_img_2);
     let candidates = candidates::select(7.0 / 255.0, &multires_gradients_1_norm)
@@ -53,6 +55,12 @@ fn main() {
     );
 }
 
+struct Model {
+    level: usize,
+    iteration: usize,
+    motion: Isometry3<Float>,
+}
+
 fn track(
     multires_camera_1: &Vec<Camera>,
     multires_camera_2: &Vec<Camera>,
@@ -70,29 +78,36 @@ fn track(
     //         * (5) Solve the step computation using Levenberg-Marquardt dampening instead of the Gauss-Newton
     //         * (6) Update (recompute) the residuals
 
-    let mut motion = Isometry3::identity();
+    let motion = Isometry3::identity();
+    let mut model = Model {
+        level: 0,
+        iteration: 0,
+        motion,
+    };
     for level in (1..6).rev() {
+        model.level = level;
+        model.iteration = 0;
         println!("--- level {}", level);
         let cam_1 = &multires_camera_1[level];
         let cam_2 = &multires_camera_2[level];
         let intrinsics = &cam_1.intrinsics;
         let img_1 = &multires_img_1[level];
-        let img_1_name = &["out/lvl_", level.to_string().as_str(), "_1.png"].concat();
+        // let img_1_name = &["out/lvl_", level.to_string().as_str(), "_1.png"].concat();
         // interop::image_from_matrix(&img_1).save(img_1_name).unwrap();
         let img_2 = &multires_img_2[level];
-        let img_2_name = &["out/lvl_", level.to_string().as_str(), "_2.png"].concat();
+        // let img_2_name = &["out/lvl_", level.to_string().as_str(), "_2.png"].concat();
         // interop::image_from_matrix(&img_2).save(img_2_name).unwrap();
         let idepth_map = &multires_idepth_1[level - 1];
         let (gx_2, gy_2) = &multires_gradients_2[level - 1];
 
-        let (new_motion, _) = optimization::iterative(
+        let (new_model, _) = optimization::iterative(
             &eval,
             &_step_levenberg_marquardt,
             &stop_criterion,
             &(intrinsics, idepth_map, img_1, img_2, gx_2, gy_2),
-            motion,
+            model,
         );
-        motion = new_motion;
+        model = new_model;
         // Some ground truth logging.
         let gt_energy = optimization::reprojection_error(idepth_map, cam_1, cam_2, img_1, img_2);
         println!("GT energy: {}", gt_energy);
@@ -103,13 +118,16 @@ fn track(
     let cam_2 = &multires_camera_2[1];
     let gt_motion = cam_2.extrinsics.inverse() * cam_1.extrinsics;
     println!("------------------------------- results");
-    println!("Computed translation: {:?}", motion.translation.vector);
+    println!(
+        "Computed translation: {:?}",
+        model.motion.translation.vector
+    );
     println!("GT       translation: {:?}", gt_motion.translation.vector);
-    println!("Computed rotation: {:?}", motion.rotation);
+    println!("Computed rotation: {:?}", model.motion.rotation);
     println!("GT       rotation: {:?}", gt_motion.rotation);
 
     // Return motion.
-    motion
+    model.motion
 }
 
 fn stop_criterion(nb_iter: usize, energy: f32, residuals: &Vec<Residual>) -> (f32, Continue) {
@@ -117,7 +135,7 @@ fn stop_criterion(nb_iter: usize, energy: f32, residuals: &Vec<Residual>) -> (f3
     println!("iter {}, energy: {}", nb_iter, new_energy);
     let continuation = if new_energy > energy {
         Continue::Backward
-    } else if nb_iter >= 50 {
+    } else if nb_iter >= 20 {
         Continue::Stop
     } else {
         Continue::Forward
@@ -159,12 +177,32 @@ fn _step_hessian_cholesky(
 fn _step_levenberg_marquardt(
     jacobian: &Vec<Jacobian>,
     residuals: &Vec<Residual>,
-    motion: &Isometry3<f32>,
-) -> Isometry3<f32> {
+    model: &Model,
+) -> Model {
     let mut hessian: Matrix6<Float> = Matrix6::zeros();
     let mut rhs: Vector6<Float> = Vector6::zeros();
-    let mean_coef = 1.0 / jacobian.len() as f32;
-    // println!("nb points: {}", jacobian.len());
+    // let mean_coef = 1.0 / jacobian.len() as f32;
+    println!("nb points: {}", jacobian.len());
+
+    // ----- dataviz
+    let csv_file = &[
+        "out/level_",
+        model.level.to_string().as_str(),
+        "_iter_",
+        model.iteration.to_string().as_str(),
+        ".csv",
+    ].concat();
+    let header = &["residual", "jac1", "jac2", "jac3", "jac4", "jac5", "jac6"];
+    let mut writer = csv::Writer::from_path(csv_file).unwrap();
+    writer.write_record(header).unwrap();
+    for (jac, res) in jacobian.iter().zip(residuals.iter()) {
+        let row_data = iter::once(res)
+            .chain(jac.as_slice().iter())
+            .map(|x| x.to_string());
+        writer.write_record(row_data).unwrap();
+    }
+    writer.flush().unwrap();
+    // ----- end dataviz
 
     // ----- debug
     let full_jacobian = MatrixMN::<_, _, Dynamic>::from_columns(jacobian.as_slice());
@@ -182,10 +220,11 @@ fn _step_levenberg_marquardt(
     // println!("Jac * JacT: {}", jac_jac_t / 100000000.0);
     let eigen_values = jac_jac_t.eigenvalues().unwrap();
     let eigen_values_64 = jac_jac_t_64.eigenvalues().unwrap();
-    // println!(
-    //     "Eigenvalues Jac * JacT: {:?}",
-    //     (eigen_values / 10000000000.0).data
-    // );
+    println!(
+        "Eigenvalues Jac * JacT: {:?}",
+        // (eigen_values / 10000000000.0).data
+        eigen_values.data
+    );
     // println!("Eigenvalues Jac * JacT (64): {:?}", (eigen_values_64).data);
     // ----- end debug
 
@@ -195,29 +234,29 @@ fn _step_levenberg_marquardt(
         rhs = rhs + res * jac;
     }
 
-    // Scale changement do not change cholesky decomposition in theory
-    // but may avoid overflowing max f32 values (3.402823 * 10^38)
-    hessian = mean_coef * hessian;
-    rhs = mean_coef * rhs;
+    let mut hessian_64 = jac_jac_t_64;
+    let full_residual = DVector::from_column_slice(residuals.len(), residuals.as_slice());
+    let rhs_64 = full_jacobian_64 * (full_residual.map(|x| x as f64));
     // println!("hessian: {}", &hessian);
     // println!("rhs: {}", &rhs);
 
-    // SVD to check condition number
-    let singular_values = hessian.singular_values();
-    // println!("Singular values hessian: {:?}", singular_values.data);
-
-    let levenberg_marquardt_coef = 1.2;
-    hessian.m11 = levenberg_marquardt_coef * hessian.m11;
-    hessian.m22 = levenberg_marquardt_coef * hessian.m22;
-    hessian.m33 = levenberg_marquardt_coef * hessian.m33;
-    hessian.m44 = levenberg_marquardt_coef * hessian.m44;
-    hessian.m55 = levenberg_marquardt_coef * hessian.m55;
-    hessian.m66 = levenberg_marquardt_coef * hessian.m66;
-    let twist_step = 0.2 * hessian.cholesky().unwrap().solve(&(-rhs));
+    let levenberg_marquardt_coef = 1.6;
+    hessian_64.m11 = levenberg_marquardt_coef * hessian_64.m11;
+    hessian_64.m22 = levenberg_marquardt_coef * hessian_64.m22;
+    hessian_64.m33 = levenberg_marquardt_coef * hessian_64.m33;
+    hessian_64.m44 = levenberg_marquardt_coef * hessian_64.m44;
+    hessian_64.m55 = levenberg_marquardt_coef * hessian_64.m55;
+    hessian_64.m66 = levenberg_marquardt_coef * hessian_64.m66;
+    let twist_step_64 = 0.05 * hessian_64.cholesky().unwrap().solve(&(-rhs_64));
+    let twist_step = twist_step_64.map(|x| x as f32);
     // println!("twist_step: {}", &twist_step);
-    let new_motion = se3::exp(se3::from_vector(twist_step)) * motion;
+    let new_motion = se3::exp(se3::from_vector(twist_step)) * model.motion;
     // println!("Computed translation: {:?}", new_motion.translation.vector);
-    new_motion
+    Model {
+        level: model.level,
+        iteration: 1 + model.iteration,
+        motion: new_motion,
+    }
 }
 
 type Observation<'a> = (
@@ -229,7 +268,7 @@ type Observation<'a> = (
     &'a DMatrix<Float>,
 );
 
-fn eval(observation: &Observation, motion: &Isometry3<f32>) -> (Vec<Jacobian>, Vec<Residual>) {
+fn eval(observation: &Observation, model: &Model) -> (Vec<Jacobian>, Vec<Residual>) {
     let (intrinsics, idepth_map, img_1, img_2, gx_2, gy_2) = observation;
     let mut all_jacobians = Vec::new();
     let mut all_residuals = Vec::new();
@@ -244,13 +283,15 @@ fn eval(observation: &Observation, motion: &Isometry3<f32>) -> (Vec<Jacobian>, V
             // nb_candidates += 1;
             let (col, row) = helper::div_rem(index, nrows);
             let point = Point2::new(col as f32, row as f32);
-            let (reprojected, new_idepth) = reproject(point, *idepth, intrinsics, motion);
+            let (reprojected, new_idepth) = reproject(point, *idepth, intrinsics, &model.motion);
             if helper::in_image_bounds((reprojected[0], reprojected[1]), (nrows, ncols)) {
                 // nb_in_frame += 1;
                 let color_ref = img_1[(row, col)];
                 let (jacobian, residual) = eval_at(reprojected, new_idepth, color_ref);
-                all_jacobians.push(jacobian);
-                all_residuals.push(residual);
+                if residual.abs() < 0.05 {
+                    all_jacobians.push(jacobian);
+                    all_residuals.push(residual);
+                }
             }
         }
     }
@@ -293,8 +334,39 @@ fn jacobian_at(
     let g_y = optimization::interpolate_with(indices, coefs, gradient_y);
     let gradient = Gradient(g_x, g_y);
     let img_xy = optimization::interpolate_with(indices, coefs, img);
-    let residual = img_xy - img_origin_pixel as f32;
-    (compute_jacobian(point, idepth, focale, gradient), residual)
+    let residual = img_xy - img_origin_pixel as Float;
+    let (w, h) = img.shape();
+    (
+        compute_normalized_jacobian((w as Float, h as Float), point, idepth, focale, gradient),
+        // compute_jacobian(point, idepth, focale, gradient),
+        residual,
+    )
+}
+
+// Normalize the coordinates and adjust intrinsics.
+fn compute_normalized_jacobian(
+    image_size: (Float, Float),
+    point: Point2<Float>,
+    idepth: Float,
+    f: &Focale,
+    g: Gradient,
+) -> Jacobian {
+    let (w, h) = image_size;
+    let (w_scale, h_scale) = (1.0 / (w - 1.0), 1.0 / (h - 1.0));
+    let (u, v) = (w_scale * point[0], h_scale * point[1]);
+    let uv = u * v;
+    let Focale(fx, fy) = f;
+    let Gradient(dx, dy) = g;
+    let fdx = w_scale * fx * dx;
+    let fdy = h_scale * fy * dy;
+    Vector6::new(
+        idepth * fdx,
+        idepth * fdy,
+        -(idepth * (u * fdx + v * fdy)),
+        -(uv * fdx + (1.0 + v * v) * fdy),
+        uv * fdy + (1.0 + u * u) * fdx,
+        u * fdy - v * fdx,
+    )
 }
 
 fn compute_jacobian(point: Point2<Float>, idepth: Float, f: &Focale, g: Gradient) -> Jacobian {

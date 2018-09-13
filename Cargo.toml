@@ -45,3 +45,6 @@ quickcheck = "0.6"
 
 # Approximate equalities
 approx = "0.2"
+
+# CSV
+csv = "1"
