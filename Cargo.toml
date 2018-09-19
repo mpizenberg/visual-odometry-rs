@@ -38,6 +38,10 @@ num-traits = "0.2"
 # Parsing files
 nom = "4"
 
+# More iterators
+itertools = "0.7"
+
+
 [dev-dependencies]
 
 # Property based testing
