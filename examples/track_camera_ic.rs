@@ -24,11 +24,20 @@ use std::f32::EPSILON;
 use std::iter;
 
 fn main() {
+    // read trajectory file with TUM RGBD syntax (same as icl nuim syntax)
     let all_extrinsics = icl_nuim::read_extrinsics("data/trajectory-gt.txt").unwrap();
+
+    // Generate multiresolution of camera, image, and single resolution depth map
+    // of the two images we are testing.
     let (multires_camera_1, multires_img_1, depth_1) =
         icl_nuim::prepare_data(1, &all_extrinsics).unwrap();
     let (multires_camera_2, multires_img_2, _) =
-        icl_nuim::prepare_data(2, &all_extrinsics).unwrap();
+        icl_nuim::prepare_data(20, &all_extrinsics).unwrap();
+
+    //
+    //
+    //
+
     let multires_gradients_1_norm = multires_float::gradients(&multires_img_1);
     let multires_gradients_1_xy = multires_float::gradients_xy(&multires_img_1);
     let candidates = candidates::select(7.0 / 255.0, &multires_gradients_1_norm)
@@ -161,7 +170,7 @@ fn step_hessian_cholesky(
         hessian = hessian + jac * jac.transpose();
         rhs = rhs + res * jac;
     }
-    let twist_step = hessian.cholesky().unwrap().solve(&rhs);
+    let twist_step = 0.1 * hessian.cholesky().unwrap().solve(&rhs);
     let new_motion = model.motion * se3::exp(se3::from_vector(twist_step)).inverse();
     Model {
         level: model.level,
@@ -191,7 +200,7 @@ fn eval(observation: &Observation, model: &Model) -> (Vec<Jacobian>, Vec<Residua
             let (indices, coefs) = optimization::linear_interpolator(Point2::new(x, y));
             let color = optimization::interpolate_with(indices, coefs, img_2);
             let residual = color - color_ref;
-            if residual.abs() < 100000.0 {
+            if residual.abs() < 0.05 {
                 jacobians_kept.push(jac);
                 residuals_kept.push(residual);
             }
