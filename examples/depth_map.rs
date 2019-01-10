@@ -17,7 +17,8 @@ fn main() {
     let (img, depth_map) = icl_nuim::open_imgs(1).unwrap();
 
     // Save on disk for visualizations.
-    view::color_idepth(&depth_map.map(inverse_depth::from_depth))
+    let from_depth = |depth| inverse_depth::from_depth(icl_nuim::DEPTH_SCALE, depth);
+    view::color_idepth(&depth_map.map(from_depth))
         .save("out/full_depth_color.png")
         .unwrap();
 
@@ -28,17 +29,18 @@ fn main() {
     let multires_gradient_norm = multires::gradients(&multires_img);
 
     // Canditates.
-    let multires_candidates = candidates::select(&multires_gradient_norm);
+    let multires_candidates = candidates::select(7, &multires_gradient_norm);
 
     // Get an half resolution depth map that will be the base for
     // the inverse depth map on candidates.
     let half_res_depth = multires::halve(&depth_map, |a, b, c, d| {
-        let a = inverse_depth::from_depth(a);
-        let b = inverse_depth::from_depth(b);
-        let c = inverse_depth::from_depth(c);
-        let d = inverse_depth::from_depth(d);
+        let a = from_depth(a);
+        let b = from_depth(b);
+        let c = from_depth(c);
+        let d = from_depth(d);
         inverse_depth::fuse(a, b, c, d, inverse_depth::strategy_statistically_similar)
-    }).unwrap();
+    })
+    .unwrap();
 
     // Save on disk for visualizations.
     view::color_idepth(&half_res_depth)
