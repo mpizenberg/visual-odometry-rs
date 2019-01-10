@@ -4,6 +4,7 @@ extern crate nalgebra as na;
 
 use cv::candidates;
 use cv::helper;
+use cv::icl_nuim;
 use cv::interop;
 use cv::inverse_depth;
 use cv::multires;
@@ -76,7 +77,7 @@ fn evaluate_all_strategies_for(
     let multires_gradient_norm = multires::gradients(&multires_img);
 
     // canditates
-    let multires_candidates = candidates::select(&multires_gradient_norm);
+    let multires_candidates = candidates::select(7, &multires_gradient_norm);
     let higher_res_candidate = multires_candidates.last().unwrap();
 
     // Evaluate strategies.
@@ -103,7 +104,8 @@ where
     let half_res_depth = &multires_depth_map[1];
 
     // Transform depth map into an InverseDepth matrix.
-    let inverse_depth_mat = half_res_depth.map(inverse_depth::from_depth);
+    let from_depth = |depth| inverse_depth::from_depth(icl_nuim::DEPTH_SCALE, depth);
+    let inverse_depth_mat = half_res_depth.map(from_depth);
 
     // Only keep InverseDepth values corresponding to point candidates.
     // This is to emulate result of back projection of known points into a new keyframe.
@@ -129,10 +131,7 @@ where
     // Compare the lowest resolution inverse depth map of the pyramid
     // with the one from ground truth.
     let lower_res_inverse_depth = multires_inverse_depth.last().unwrap();
-    let lower_res_inverse_depth_gt = multires_depth_map
-        .last()
-        .unwrap()
-        .map(inverse_depth::from_depth);
+    let lower_res_inverse_depth_gt = multires_depth_map.last().unwrap().map(from_depth);
     evaluate_idepth(lower_res_inverse_depth, &lower_res_inverse_depth_gt)
 }
 
