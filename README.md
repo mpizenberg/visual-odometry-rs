@@ -27,3 +27,7 @@ they correspond to a unique 3D point in the scene.
 > ground truth file (`data/trajectory-gt.txt`) corresponds to the **second**
 > frame, i.e. the frame 1 (first frame being number 0).
 > That is why there are 1509 images, but only 1508 camera coordinates in the file.
+
+### depth_map_candidates.rs
+
+Compute and visualize multi-resolution inverse depth maps of candidates points.
