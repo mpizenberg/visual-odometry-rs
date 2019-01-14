@@ -8,6 +8,7 @@ extern crate rand;
 pub mod camera;
 pub mod candidates;
 pub mod colormap;
+pub mod gradient;
 pub mod helper;
 pub mod icl_nuim;
 pub mod interop;

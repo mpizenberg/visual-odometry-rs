@@ -11,25 +11,31 @@ use inverse_depth::{self, InverseDepth};
 pub type Float = f32;
 
 // Create an RGB image of an inverse depth map.
-pub fn color_idepth(idepth_map: &DMatrix<InverseDepth>) -> RgbImage {
+pub fn idepth_image(idepth_map: &DMatrix<InverseDepth>) -> RgbImage {
     let viridis = &colormap::viridis_u8()[0..256];
     let (d_min, d_max) = min_max(idepth_map).unwrap();
-    interop::rgb_from_matrix(&idepth_map.map(|idepth| idepth_color(viridis, d_min, d_max, &idepth)))
+    interop::rgb_from_matrix(
+        &idepth_map.map(|idepth| idepth_enum_colormap(viridis, d_min, d_max, &idepth)),
+    )
 }
 
 fn min_max(idepth_map: &DMatrix<InverseDepth>) -> Option<(Float, Float)> {
-    let mut min_temp: Float = 10000.0;
-    let mut max_temp: Float = 0.0;
+    let mut min_temp: Option<Float> = None;
+    let mut max_temp: Option<Float> = None;
     idepth_map.iter().for_each(|idepth| {
         if let Some((d, _)) = inverse_depth::with_variance(idepth) {
-            min_temp = min_temp.min(d);
-            max_temp = max_temp.max(d);
+            min_temp = min_temp.map(|x| x.min(d)).or(Some(d));
+            max_temp = max_temp.map(|x| x.max(d)).or(Some(d));
         }
     });
-    Some((min_temp, max_temp))
+    if let (Some(min_value), Some(max_value)) = (min_temp, max_temp) {
+        Some((min_value, max_value))
+    } else {
+        None
+    }
 }
 
-// INVERSE DEPTH ###########################################
+// INVERSE DEPTH HELPERS #############################################
 
 // Visualize the enum as an 8-bits intensity:
 // Unknown:      black
@@ -44,7 +50,7 @@ pub fn idepth_enum(idepth: &InverseDepth) -> u8 {
 }
 
 // Use viridis colormap + red for Discarded
-pub fn idepth_color(
+pub fn idepth_enum_colormap(
     colormap: &[(u8, u8, u8)],
     d_min: Float,
     d_max: Float,

@@ -1,33 +1,12 @@
+use gradient;
 use nalgebra::{DMatrix, Scalar};
 
 pub type Float = f32;
 
-pub fn pyramid_with_max_n_levels<I, F, T, U>(
-    levels: usize,
-    mat: DMatrix<T>,
-    init: I,
-    f: F,
-) -> Vec<DMatrix<U>>
-where
-    I: Fn(DMatrix<T>) -> DMatrix<U>,
-    F: Fn(&DMatrix<U>) -> Option<DMatrix<U>>,
-    T: Scalar,
-    U: Scalar,
-{
-    let mut level = 1;
-    let new_f = |x: &DMatrix<U>| {
-        if level < levels {
-            level = level + 1;
-            f(x)
-        } else {
-            None
-        }
-    };
-    pyramid(mat, init, new_f)
-}
-
+// Recursively generate a pyramid of matrices where each level
+// is half the previous resolution, computed with the mean of each 2x2 block.
 pub fn mean_pyramid(max_levels: usize, mat: DMatrix<u8>) -> Vec<DMatrix<u8>> {
-    pyramid_with_max_n_levels(
+    limited_sequence(
         max_levels,
         mat,
         |m| m,
@@ -43,7 +22,37 @@ pub fn mean_pyramid(max_levels: usize, mat: DMatrix<u8>) -> Vec<DMatrix<u8>> {
     )
 }
 
-pub fn pyramid<I, F, T, U>(mat: DMatrix<T>, init: I, mut f: F) -> Vec<DMatrix<U>>
+// Recursively apply a function transforming the image
+// until it's not possible anymore or the max number of iterations is reached.
+// Using iterations = 0 has the same effect than iterations = 1 since it always has
+// at least one matrix (the init matrix).
+pub fn limited_sequence<I, F, T, U>(
+    iterations: usize,
+    mat: DMatrix<T>,
+    init: I,
+    f: F,
+) -> Vec<DMatrix<U>>
+where
+    I: Fn(DMatrix<T>) -> DMatrix<U>,
+    F: Fn(&DMatrix<U>) -> Option<DMatrix<U>>,
+    T: Scalar,
+    U: Scalar,
+{
+    let mut iteration = 1;
+    let f_limited = |x: &DMatrix<U>| {
+        if iteration < iterations {
+            iteration = iteration + 1;
+            f(x)
+        } else {
+            None
+        }
+    };
+    sequence(mat, init, f_limited)
+}
+
+// Recursively apply a function transforming the image
+// until it's not possible anymore.
+pub fn sequence<I, F, T, U>(mat: DMatrix<T>, init: I, mut f: F) -> Vec<DMatrix<U>>
 where
     I: Fn(DMatrix<T>) -> DMatrix<U>,
     F: FnMut(&DMatrix<U>) -> Option<DMatrix<U>>,
@@ -52,12 +61,15 @@ where
 {
     let mut pyr = Vec::new();
     pyr.push(init(mat));
-    while let Some(half_res) = f(pyr.last().unwrap()) {
-        pyr.push(half_res);
+    while let Some(new_mat) = f(pyr.last().unwrap()) {
+        pyr.push(new_mat);
     }
     pyr
 }
 
+// Halve the resolution of a matrix by applying a function to each 2x2 block.
+// If one size of the matrix is < 2 then this function returns None.
+// If one size is odd, its last line/column is dropped.
 pub fn halve<F, T, U>(mat: &DMatrix<T>, f: F) -> Option<DMatrix<U>>
 where
     F: Fn(T, T, T, T) -> U,
@@ -83,15 +95,21 @@ where
 
 // Gradients stuff ###################################################
 
-pub fn gradients(multires_mat: &Vec<DMatrix<u8>>) -> Vec<DMatrix<u16>> {
+// Compute centered gradients norm at each resolution from
+// the image at the higher resolution.
+// As a consequence their is one less level in the gradients pyramid.
+pub fn gradients_squared_norm(multires_mat: &Vec<DMatrix<u8>>) -> Vec<DMatrix<u16>> {
     let nb_levels = multires_mat.len();
     multires_mat
         .iter()
         .take(nb_levels - 1)
-        .map(|mat| halve(mat, gradient_squared_norm).unwrap())
+        .map(|mat| halve(mat, gradient::bloc_squared_norm).unwrap())
         .collect()
 }
 
+// Compute centered gradients at each resolution from
+// the image at the higher resolution.
+// As a consequence their is one less level in the gradients pyramid.
 pub fn gradients_xy(multires_mat: &Vec<DMatrix<u8>>) -> Vec<(DMatrix<i16>, DMatrix<i16>)> {
     let nb_levels = multires_mat.len();
     multires_mat
@@ -99,36 +117,9 @@ pub fn gradients_xy(multires_mat: &Vec<DMatrix<u8>>) -> Vec<(DMatrix<i16>, DMatr
         .take(nb_levels - 1)
         .map(|mat| {
             (
-                halve(mat, gradient_x).unwrap(),
-                halve(mat, gradient_y).unwrap(),
+                halve(mat, gradient::bloc_x).unwrap(),
+                halve(mat, gradient::bloc_y).unwrap(),
             )
         })
         .collect()
-}
-
-pub fn gradient_x(a: u8, b: u8, c: u8, d: u8) -> i16 {
-    let a = a as i16;
-    let b = b as i16;
-    let c = c as i16;
-    let d = d as i16;
-    (c + d - a - b) / 2
-}
-
-pub fn gradient_y(a: u8, b: u8, c: u8, d: u8) -> i16 {
-    let a = a as i16;
-    let b = b as i16;
-    let c = c as i16;
-    let d = d as i16;
-    (b - a + d - c) / 2
-}
-
-fn gradient_squared_norm(a: u8, b: u8, c: u8, d: u8) -> u16 {
-    let a = a as i32;
-    let b = b as i32;
-    let c = c as i32;
-    let d = d as i32;
-    let dx = c + d - a - b;
-    let dy = b - a + d - c;
-    // I have checked that the max value is in u16.
-    ((dx * dx + dy * dy) / 4) as u16
 }
