@@ -31,3 +31,17 @@ they correspond to a unique 3D point in the scene.
 ### depth_map_candidates.rs
 
 Compute and visualize multi-resolution inverse depth maps of candidates points.
+
+### multires_depth_strategies.rs
+
+The purpose is to evaluate different strategies to construct the multi-resolution
+depth map from the highest resolution.
+In this example, we evaluate two strategies:
+
+1. `inverse_depth::strategy_statistically_similar`
+2. `inverse_depth::strategy_dso_mean`
+
+The `dso_mean` strategy is the one employed by DSO.
+The rule is simple, if at least one of the 4 subpixels of the higher resolution
+has a known inverse depth,
+we compute the mean of the subpixels inverse depths.
