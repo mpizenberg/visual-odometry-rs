@@ -14,7 +14,7 @@ Mainly images from the first sequence of the [ICL-NUIM][icl-nuim] dataset.
 
 [icl-nuim]: https://www.doc.ic.ac.uk/~ahanda/VaFRIC/iclnuim.html
 
-### camera.rs
+### 01-camera.rs
 
 Use the bottom left corner of the image on the wall
 to validate camera projections.
@@ -28,11 +28,11 @@ they correspond to a unique 3D point in the scene.
 > frame, i.e. the frame 1 (first frame being number 0).
 > That is why there are 1509 images, but only 1508 camera coordinates in the file.
 
-### depth_map_candidates.rs
+### 02-depth_map_candidates.rs
 
 Compute and visualize multi-resolution inverse depth maps of candidates points.
 
-### multires_depth_strategies.rs
+### 03-multires_depth_strategies.rs
 
 The purpose is to evaluate different strategies to construct the multi-resolution
 depth map from the highest resolution.
