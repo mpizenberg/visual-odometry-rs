@@ -45,3 +45,18 @@ The `dso_mean` strategy is the one employed by DSO.
 The rule is simple, if at least one of the 4 subpixels of the higher resolution
 has a known inverse depth,
 we compute the mean of the subpixels inverse depths.
+
+The `statistically_similar` strategy consists in merging pixels
+only if the follow some statistic rules.
+Otherwise, the point is discarded for the lower resolution.
+
+Results are saved into a CSV file,
+which can be explored using a tool like [data voyager][data-voyager].
+
+At the moment of writing this test, no significant difference is visible
+between the two strategies, especially with a reprojection
+with less than 5 frames difference.
+This may also be due to the case that most of the time,
+there are only two points to merge, and it behaves like the `dso_mean` case.
+
+[data-voyager]: http://vega.github.io/voyager/
