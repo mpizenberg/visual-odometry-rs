@@ -151,10 +151,12 @@ fn stop_criterion_gauss_newton(
 
 fn eval_f<P>(observations: &Obs, model: f32, params: P) -> OptimState<P> {
     let f_model = f(model, &observations.x);
-    let jacobian = -1.0 * observations.x.component_mul(&f_model);
-    let residuals = f_model - &observations.y;
-    let gradient = &jacobian.transpose() * &residuals;
+    let residuals = &f_model - &observations.y;
     let energy = residuals.iter().map(|r| r * r).sum();
+    // Is it possible to avoid computing the jacobian and gradient
+    // (in case of higher energy) without complexifying the optimization API?
+    let jacobian = -1.0 * f_model.component_mul(&observations.x);
+    let gradient = &jacobian.transpose() * &residuals;
     State {
         params,
         energy,
