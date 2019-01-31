@@ -16,8 +16,11 @@ pub struct State<Params, Float, Model, Residuals, Jacobian, Gradient> {
     pub gradient: Gradient,
 }
 
-pub trait QuasiNewtonOptimizer<Observations, P, F, M, R, J, G, Delta> {
-    fn eval(observations: &Observations, model: M) -> State<P, F, M, R, J, G>;
+pub trait QuasiNewtonOptimizer<Observations, P, F, M, R, J, G, Delta>
+where
+    P: Clone,
+{
+    fn eval(observations: &Observations, model: M, params: P) -> State<P, F, M, R, J, G>;
     fn step(state: &State<P, F, M, R, J, G>) -> Delta;
     fn apply(delta: Delta, model: &M) -> M;
     fn stop_criterion(
@@ -35,7 +38,7 @@ pub trait QuasiNewtonOptimizer<Observations, P, F, M, R, J, G, Delta> {
             nb_iter = nb_iter + 1;
             let delta = Self::step(&state);
             let new_model = Self::apply(delta, &state.model);
-            let new_state = Self::eval(observations, new_model);
+            let new_state = Self::eval(observations, new_model, state.params.clone());
             let (kept_state, continuation) = Self::stop_criterion(nb_iter, state, new_state);
             state = kept_state;
             if let Continue::Stop = continuation {
