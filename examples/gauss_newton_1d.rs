@@ -23,7 +23,7 @@ fn main() {
     let nb_data: usize = 100;
 
     // Noisy data to avoid perfect conditions.
-    let domain = linspace(-3.0, 3.0, nb_data);
+    let domain = linspace(-4.0, 3.0, nb_data);
     let seed = [0; 32];
     let mut rng: StdRng = SeedableRng::from_seed(seed);
     let mut distribution = Uniform::from(-1.0..1.0);
@@ -116,12 +116,12 @@ fn stop_criterion_levenberg_marquardt(
         // Cases when we continue to iterate:
         (false, false) => {
             let mut kept_state = new_state;
-            kept_state.params = 0.1 * kept_state.params;
+            kept_state.params = 0.5 * kept_state.params;
             (kept_state, Continue::Forward)
         }
         (true, false) => {
             let mut kept_state = old_state;
-            kept_state.params = 10.0 * kept_state.params;
+            kept_state.params = 2.0 * kept_state.params;
             (kept_state, Continue::Forward)
         }
     }
