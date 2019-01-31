@@ -8,17 +8,18 @@ pub enum Continue {
 }
 
 pub struct State<Params, Float, Model, Residuals, Jacobian, Gradient> {
-    params: Params,
-    energy: Float,
-    model: Model,
-    residuals: Residuals,
-    jacobian: Jacobian,
-    gradient: Gradient,
+    pub params: Params,
+    pub energy: Float,
+    pub model: Model,
+    pub residuals: Residuals,
+    pub jacobian: Jacobian,
+    pub gradient: Gradient,
 }
 
-pub trait QuasiNewtonOptimizer<Observations, P, F, M, R, J, G> {
+pub trait QuasiNewtonOptimizer<Observations, P, F, M, R, J, G, Delta> {
     fn eval(observations: &Observations, model: M) -> State<P, F, M, R, J, G>;
-    fn step(state: &State<P, F, M, R, J, G>) -> M;
+    fn step(state: &State<P, F, M, R, J, G>) -> Delta;
+    fn apply(delta: Delta, model: &M) -> M;
     fn stop_criterion(
         nb_iter: usize,
         old_state: State<P, F, M, R, J, G>,
@@ -32,7 +33,8 @@ pub trait QuasiNewtonOptimizer<Observations, P, F, M, R, J, G> {
         let mut nb_iter = 0;
         loop {
             nb_iter = nb_iter + 1;
-            let new_model = Self::step(&state);
+            let delta = Self::step(&state);
+            let new_model = Self::apply(delta, &state.model);
             let new_state = Self::eval(observations, new_model);
             let (kept_state, continuation) = Self::stop_criterion(nb_iter, state, new_state);
             state = kept_state;
@@ -42,6 +44,8 @@ pub trait QuasiNewtonOptimizer<Observations, P, F, M, R, J, G> {
         }
     }
 }
+
+pub struct GaussNewtonOptimizer;
 
 // pub struct GaussNewtonOptimizer;
 //
