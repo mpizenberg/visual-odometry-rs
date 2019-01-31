@@ -4,14 +4,14 @@ extern crate nalgebra as na;
 
 use std::fs;
 
-use cv::candidates;
-use cv::helper;
-use cv::icl_nuim;
-use cv::inverse_depth;
-use cv::multires;
-use cv::view;
+use crate::cv::candidates;
+use crate::cv::helper;
+use crate::cv::icl_nuim;
+use crate::cv::inverse_depth;
+use crate::cv::multires;
+use crate::cv::view;
 
-use inverse_depth::InverseDepth;
+use crate::inverse_depth::InverseDepth;
 
 const OUT_DIR: &str = "out/example/depth_map_candidates/";
 
