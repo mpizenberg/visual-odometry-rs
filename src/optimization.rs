@@ -15,8 +15,8 @@ pub fn iterative<
     CriterionFn,  // Stopping criterion
 >(
     eval: EvalFn,
-    step: StepFn,
-    stop_criterion: CriterionFn,
+    _step: StepFn,
+    _stop_criterion: CriterionFn,
     observations: &Observations,
     initial_model: Model,
     initial_params: Params,
@@ -31,16 +31,16 @@ where
     ) -> ((Params, Float, Gradient, Model), Continue),
 {
     // Evaluate the model for the first time.
-    let (jacobian, gradient, residuals, energy) = eval(observations, &initial_model);
-    let mut state = (initial_params, energy, gradient, initial_model);
+    let (_jacobian, gradient, _residuals, energy) = eval(observations, &initial_model);
+    let _state = (initial_params, energy, gradient, initial_model);
     let mut nb_iter = 0;
 
     loop {
         nb_iter = nb_iter + 1;
-        let (model, params) = step(&jacobian, &residuals, &state.3, &state.0);
-        let (jacobian, gradient, residuals, energy) = eval(observations, &model);
-        let step_state = (params, energy, gradient, model);
-        let (kept_state, continuation) = stop_criterion(nb_iter, state, step_state);
+        // let (model, params) = step(&jacobian, &residuals, &state.3, &state.0);
+        // let (jacobian, gradient, residuals, energy) = eval(observations, &model);
+        // let step_state = (params, energy, gradient, model);
+        // let (kept_state, continuation) = stop_criterion(nb_iter, state, step_state);
     }
 }
 

@@ -4,8 +4,10 @@
 //     * details: http://ethaneade.com/lie.pdf
 //     * summary: http://ethaneade.com/lie_groups.pdf
 
-use nalgebra::{Isometry3, Matrix3, Matrix4, Translation3, Vector3, Vector6, UnitQuaternion, Quaternion};
-use so3;
+use crate::so3;
+use nalgebra::{
+    Isometry3, Matrix3, Matrix4, Quaternion, Translation3, UnitQuaternion, Vector3, Vector6,
+};
 use std::f32::consts::PI;
 use std::ops::Add;
 
@@ -30,7 +32,10 @@ pub struct Twist {
 impl Add for Twist {
     type Output = Twist;
     fn add(self, other: Twist) -> Twist {
-        Twist { v: self.v + other.v, w: self.w + other.w }
+        Twist {
+            v: self.v + other.v,
+            w: self.w + other.w,
+        }
     }
 }
 
@@ -56,7 +61,7 @@ pub fn hat(xi: Twist) -> Matrix4<Float> {
     let v2 = xi.v[1];
     let v3 = xi.v[2];
     Matrix4::from_column_slice(&[
-        0.0, w3, -w2, 0.0, -w3, 0.0, w1, 0.0, w2, -w1, 0.0, 0.0, v1, v2, v3, 0.0
+        0.0, w3, -w2, 0.0, -w3, 0.0, w1, 0.0, w2, -w1, 0.0, 0.0, v1, v2, v3, 0.0,
     ])
 }
 
@@ -81,8 +86,10 @@ pub fn exp(xi: Twist) -> Isometry3<Float> {
         let coef_omega = 0.5 - _1_24 * theta_2; // TAYLOR
         let coef_omega_2 = _1_6 - _1_120 * theta_2; // TAYLOR
         let v = Matrix3::identity() + coef_omega * omega + coef_omega_2 * omega_2;
-        let rotation =
-            UnitQuaternion::from_quaternion(Quaternion::from_parts(real_factor, imag_factor * xi.w));
+        let rotation = UnitQuaternion::from_quaternion(Quaternion::from_parts(
+            real_factor,
+            imag_factor * xi.w,
+        ));
         Isometry3::from_parts(Translation3::from_vector(v * xi.v), rotation)
     } else {
         let theta = theta_2.sqrt();
@@ -92,8 +99,10 @@ pub fn exp(xi: Twist) -> Isometry3<Float> {
         let coef_omega = (1.0 - theta.cos()) / theta_2;
         let coef_omega_2 = (theta - theta.sin()) / (theta * theta_2);
         let v = Matrix3::identity() + coef_omega * omega + coef_omega_2 * omega_2;
-        let rotation =
-            UnitQuaternion::from_quaternion(Quaternion::from_parts(real_factor, imag_factor * xi.w));
+        let rotation = UnitQuaternion::from_quaternion(Quaternion::from_parts(
+            real_factor,
+            imag_factor * xi.w,
+        ));
         Isometry3::from_parts(Translation3::from_vector(v * xi.v), rotation)
     }
 }
@@ -111,7 +120,10 @@ pub fn log(iso: Isometry3<Float>) -> Twist {
         let x_2 = imag_norm_2 / (real_factor * real_factor);
         let coef_omega_2 = _1_12 * (1.0 + _1_15 * x_2); // TAYLOR
         let v_inv = Matrix3::identity() - 0.5 * omega + coef_omega_2 * omega_2;
-        Twist { v: v_inv * iso.translation.vector, w: w }
+        Twist {
+            v: v_inv * iso.translation.vector,
+            w: w,
+        }
     } else {
         let imag_norm = imag_norm_2.sqrt();
         let theta = if real_factor.abs() < EPSILON_TAYLOR_SERIES {
@@ -125,7 +137,10 @@ pub fn log(iso: Isometry3<Float>) -> Twist {
         let (omega, omega_2) = (so3::hat(w), so3::hat_2(w));
         let coef_omega_2 = (1.0 - 0.5 * theta * real_factor / imag_norm) / theta_2;
         let v_inv = Matrix3::identity() - 0.5 * omega + coef_omega_2 * omega_2;
-        Twist { v: v_inv * iso.translation.vector, w: w }
+        Twist {
+            v: v_inv * iso.translation.vector,
+            w: w,
+        }
     }
 }
 

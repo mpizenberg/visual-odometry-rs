@@ -1,10 +1,7 @@
-extern crate image;
-extern crate nalgebra;
-
-use camera::{self, Camera, Extrinsics, Intrinsics};
-use helper;
-use interop;
-use multires_float;
+use crate::camera::{self, Camera, Extrinsics, Intrinsics};
+use crate::helper;
+use crate::interop;
+use crate::multires_float;
 
 use nalgebra::{DMatrix, Quaternion, Translation3, UnitQuaternion};
 use std::fs::File;
