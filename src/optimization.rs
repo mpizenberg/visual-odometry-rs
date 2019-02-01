@@ -1,5 +1,3 @@
-use std::f32;
-
 pub type Float = f32;
 
 pub enum Continue {
@@ -47,13 +45,3 @@ where
         }
     }
 }
-
-pub struct GaussNewtonOptimizer;
-
-// pub struct GaussNewtonOptimizer;
-//
-// impl QuasiNewtonOptimizer for GaussNewtonOptimizer {
-//     eval
-// }
-//
-// GaussNewtonOptimizer::iterative(state)
