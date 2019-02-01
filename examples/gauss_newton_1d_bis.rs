@@ -23,7 +23,7 @@ fn run() -> Result<(), f32> {
     let nb_data: usize = 100;
 
     // Noisy data to avoid perfect conditions.
-    let domain = linspace(-4.0, 3.0, nb_data);
+    let domain = linspace(-2.0, 3.0, nb_data);
     let seed = [0; 32];
     let mut rng: StdRng = SeedableRng::from_seed(seed);
     let mut distribution = Uniform::from(-1.0..1.0);
@@ -43,7 +43,7 @@ fn run() -> Result<(), f32> {
     println!("Levenberg-Marquardt method:");
     let qn_state = LMOptimizer::init(&observations, initial_model)?;
     let state = LMState {
-        lm_coef: 1.0,
+        lm_coef: 0.1,
         data: qn_state,
     };
     LMOptimizer::iterative(&observations, state);
@@ -164,7 +164,7 @@ impl Optimizer<Obs, LMState, f32, f32, PreEval, LMPartialState, f32> for LMOptim
     }
 
     fn compute_step(state: &LMState) -> f32 {
-        let hessian = state.lm_coef * state.data.hessian;
+        let hessian = (1.0 + state.lm_coef) * state.data.hessian;
         state.data.gradient / hessian
     }
 
@@ -213,13 +213,13 @@ impl Optimizer<Obs, LMState, f32, f32, PreEval, LMPartialState, f32> for LMOptim
             (Err(model), false) => {
                 println!("\t back from {}", model);
                 let mut kept_state = s0;
-                kept_state.lm_coef = 2.0 * kept_state.lm_coef;
+                kept_state.lm_coef = 10.0 * kept_state.lm_coef;
                 (kept_state, Continue::Forward)
             }
             (Ok(qn_state), false) => {
                 println!("a = {}", qn_state.model);
                 let kept_state = LMState {
-                    lm_coef: 0.5 * s0.lm_coef,
+                    lm_coef: 0.1 * s0.lm_coef,
                     data: qn_state,
                 };
                 (kept_state, Continue::Forward)
