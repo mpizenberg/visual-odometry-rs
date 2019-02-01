@@ -23,7 +23,7 @@ fn run() -> Result<(), f32> {
     let nb_data: usize = 100;
 
     // Noisy data to avoid perfect conditions.
-    let domain = linspace(-2.0, 3.0, nb_data);
+    let domain = linspace(-4.0, 3.0, nb_data);
     let seed = [0; 32];
     let mut rng: StdRng = SeedableRng::from_seed(seed);
     let mut distribution = Uniform::from(-1.0..1.0);
@@ -34,9 +34,19 @@ fn run() -> Result<(), f32> {
         y: data_noisy,
     };
 
-    // Run iterative optimization with Gauss Newton.
+    // Run iterative optimization with Gauss-Newton.
+    println!("Gauss-Newton method:");
     let state = GNOptimizer::init(&observations, initial_model)?;
     GNOptimizer::iterative(&observations, state);
+
+    // Run iterative optimization with Levenberg-Marquardt.
+    println!("Levenberg-Marquardt method:");
+    let qn_state = LMOptimizer::init(&observations, initial_model)?;
+    let state = LMState {
+        lm_coef: 1.0,
+        data: qn_state,
+    };
+    LMOptimizer::iterative(&observations, state);
     Ok(())
 }
 
@@ -116,6 +126,103 @@ impl Optimizer<Obs, GNState, f32, f32, PreEval, GNPartialState, f32> for GNOptim
             (Ok(state), false) => {
                 println!("a = {}", state.model);
                 (state, Continue::Forward)
+            }
+        }
+    }
+}
+
+// Levenberg-Marquardt #########################################################
+
+struct LMState {
+    lm_coef: f32,
+    data: QNState,
+}
+
+struct QNState {
+    model: f32,
+    energy: f32,
+    gradient: f32,
+    hessian: f32,
+}
+
+impl State<f32, f32> for LMState {
+    fn model(&self) -> &f32 {
+        &self.data.model
+    }
+    fn energy(&self) -> f32 {
+        self.data.energy
+    }
+}
+
+type LMPartialState = Result<QNState, f32>;
+
+struct LMOptimizer;
+
+impl Optimizer<Obs, LMState, f32, f32, PreEval, LMPartialState, f32> for LMOptimizer {
+    fn initial_energy() -> f32 {
+        f32::INFINITY
+    }
+
+    fn compute_step(state: &LMState) -> f32 {
+        let hessian = state.lm_coef * state.data.hessian;
+        state.data.gradient / hessian
+    }
+
+    fn apply_step(delta: f32, model: &f32) -> f32 {
+        model - delta
+    }
+
+    fn pre_eval(obs: &Obs, model: &f32) -> PreEval {
+        let f_model = f(*model, &obs.x);
+        let residuals = &f_model - &obs.y;
+        let new_energy = residuals.iter().map(|r| r * r).sum();
+        (f_model, residuals, new_energy)
+    }
+
+    fn eval(obs: &Obs, energy: f32, pre_eval: PreEval, model: f32) -> LMPartialState {
+        let (f_model, residuals, new_energy) = pre_eval;
+        if new_energy > energy {
+            Err(model)
+        } else {
+            let jacobian = -1.0 * f_model.component_mul(&obs.x);
+            let gradient = jacobian.dot(&residuals);
+            let hessian = jacobian.dot(&jacobian);
+            Ok(QNState {
+                model,
+                energy: new_energy,
+                gradient,
+                hessian,
+            })
+        }
+    }
+
+    fn stop_criterion(nb_iter: usize, s0: LMState, s1: LMPartialState) -> (LMState, Continue) {
+        let too_many_iterations = nb_iter > 20;
+        match (s1, too_many_iterations) {
+            // Max number of iterations reached:
+            (Err(_), true) => (s0, Continue::Stop),
+            (Ok(qn_state), true) => {
+                println!("a = {}", qn_state.model);
+                let kept_state = LMState {
+                    lm_coef: s0.lm_coef, // does not matter actually
+                    data: qn_state,
+                };
+                (kept_state, Continue::Stop)
+            }
+            // Can continue to iterate:
+            (Err(model), false) => {
+                println!("\t back from {}", model);
+                let mut kept_state = s0;
+                kept_state.lm_coef = 2.0 * kept_state.lm_coef;
+                (kept_state, Continue::Forward)
+            }
+            (Ok(qn_state), false) => {
+                println!("a = {}", qn_state.model);
+                let kept_state = LMState {
+                    lm_coef: 0.5 * s0.lm_coef,
+                    data: qn_state,
+                };
+                (kept_state, Continue::Forward)
             }
         }
     }
