@@ -105,3 +105,56 @@ f: a,b,x,y -> (a-x)^2 + b * (y - x^2)^2
 
 This function is often used as a benchmark for optimization algorithms,
 so it made sense to verify that our implementation was versatile enough to solve it.
+
+### 06-optim_affine_2d.rs
+
+This time, we optimize a direct image alignment problem of the form:
+
+```
+residual(x) = I(warp(x)) - T(x)
+```
+
+Where `T` is a template image,
+`I` an transformed image by a warp function,
+`x` a pixel coordinate in the template image,
+`warp` a 2D affine transformation of the form:
+
+```
+[ 1+p1  p3    p5 ]
+[ p2    1+p4  p6 ]
+```
+
+We use an inverse compositional approach,
+as described in [Baker and Matthews, 2001][baker-matthews].
+As expected the optimization needs a lot of iterations to converge,
+roughly 300 at full resolution.
+
+[baker-matthews]: www.ncorr.com/download/publications/bakerunify.pdf
+
+### 06-optim_affine_2d_multires.rs
+
+Same problem, but instead of solving the optimization at full resolution,
+we generate multi-resolution images (5 levels).
+We start the optimization at the lower resolution (level 5).
+After each level convergence, we update the model for the next level,
+which has double the resolution, as follows:
+
+```
+p5 <- 2 * p5
+p6 <- 2 * p6
+```
+
+We also add a stopping criterion empirically.
+If the variation of the energy is < 1.0 we
+consider it has converged.
+
+With those improvements, the optimization converges with roughly 10 iterations
+at level 5, followed by 3 iterations at each other level.
+This is a huge performance improvement.
+
+### 06-optim_affine_2d_multires_bis.rs
+
+Same as previous. One difference, we compute gradients at each resolution
+with the image at the same resolution.
+This is different from the previous one,
+where we use the image at higher resolution to compute the gradient.
