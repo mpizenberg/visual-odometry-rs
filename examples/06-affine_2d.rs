@@ -31,18 +31,20 @@ fn run() -> Result<(), f32> {
     // Precompute the Hessian
     let hessians = hessians_vec(&jacobians);
 
-    // Run the optimization
+    // Init observation and model
+    let model = Vec6::zeros();
     let obs = Obs {
         template: tmp,
         image: img,
         jacobians,
         hessians,
     };
-    let model = Vec6::zeros();
+
+    // Run the optimization
     let data = LMOptimizer::init(&obs, model)?;
     let state = LMState { lm_coef: 0.1, data };
     let (state, _) = LMOptimizer::iterative(&obs, state);
-    println!("Final model: {}", state.data.model.transpose());
+    println!("Final model: {}", warp_mat(state.data.model));
     Ok(())
 }
 
@@ -95,40 +97,9 @@ impl Optimizer<Obs, LMState, Vec6, Vec6, PreEval, LMPartialState, f32> for LMOpt
     }
 
     fn apply_step(delta: Vec6, model: &Vec6) -> Vec6 {
-        // model is an affine warp parameterization:
-        // [ 1+p1  p3  p5 ]
-        // [  p2  1+p4 p6 ]
-        let delta_warp = Affine2::from_matrix_unchecked(Mat3::new(
-            1.0 + delta.x,
-            delta.z,
-            delta.a,
-            delta.y,
-            1.0 + delta.w,
-            delta.b,
-            0.0,
-            0.0,
-            1.0,
-        ));
-        let old_warp = Affine2::from_matrix_unchecked(Mat3::new(
-            1.0 + model.x,
-            model.z,
-            model.a,
-            model.y,
-            1.0 + model.w,
-            model.b,
-            0.0,
-            0.0,
-            1.0,
-        ));
-        let new_warp = (old_warp * delta_warp.inverse()).unwrap();
-        Vec6::new(
-            new_warp.m11 - 1.0,
-            new_warp.m21,
-            new_warp.m12,
-            new_warp.m22 - 1.0,
-            new_warp.m13,
-            new_warp.m23,
-        )
+        let delta_warp = Affine2::from_matrix_unchecked(warp_mat(delta));
+        let old_warp = Affine2::from_matrix_unchecked(warp_mat(model.clone()));
+        warp_params((old_warp * delta_warp.inverse()).unwrap())
     }
 
     fn pre_eval(obs: &Obs, model: &Vec6) -> PreEval {
@@ -182,7 +153,7 @@ impl Optimizer<Obs, LMState, Vec6, Vec6, PreEval, LMPartialState, f32> for LMOpt
     }
 
     fn stop_criterion(nb_iter: usize, s0: LMState, s1: LMPartialState) -> (LMState, Continue) {
-        let too_many_iterations = nb_iter > 5;
+        let too_many_iterations = nb_iter > 300;
         match (s1, too_many_iterations) {
             // Max number of iterations reached:
             (Err(_), true) => (s0, Continue::Stop),
@@ -222,15 +193,15 @@ fn gradient(im: &DMatrix<u8>) -> (DMatrix<i16>, DMatrix<i16>) {
     let top = im.slice((0, 1), (nb_rows - 2, nb_cols - 2));
     let bottom = im.slice((2, 1), (nb_rows - 2, nb_cols - 2));
     let left = im.slice((1, 0), (nb_rows - 2, nb_cols - 2));
-    let right = im.slice((2, 0), (nb_rows - 2, nb_cols - 2));
+    let right = im.slice((1, 2), (nb_rows - 2, nb_cols - 2));
     let mut grad_x = DMatrix::zeros(nb_rows, nb_cols);
     let mut grad_y = DMatrix::zeros(nb_rows, nb_cols);
     let mut grad_x_inner = grad_x.slice_mut((1, 1), (nb_rows - 2, nb_cols - 2));
     let mut grad_y_inner = grad_y.slice_mut((1, 1), (nb_rows - 2, nb_cols - 2));
     for j in 0..nb_cols - 2 {
         for i in 0..nb_rows - 2 {
-            grad_x_inner[(i, j)] = right[(i, j)] as i16 - left[(i, j)] as i16;
-            grad_y_inner[(i, j)] = bottom[(i, j)] as i16 - top[(i, j)] as i16;
+            grad_x_inner[(i, j)] = (right[(i, j)] as i16 - left[(i, j)] as i16) / 2;
+            grad_y_inner[(i, j)] = (bottom[(i, j)] as i16 - top[(i, j)] as i16) / 2;
         }
     }
     (grad_x, grad_y)
@@ -292,4 +263,28 @@ fn interpolate(x: f32, y: f32, image: &DMatrix<u8>) -> Option<f32> {
     } else {
         None
     }
+}
+
+fn warp_mat(params: Vec6) -> Mat3 {
+    // Affine warp parameterization:
+    // [ 1+p1  p3  p5 ]
+    // [  p2  1+p4 p6 ]
+    #[rustfmt::skip]
+    let mat = Mat3::new(
+        1.0 + params.x, params.z,       params.a,
+        params.y,       1.0 + params.w, params.b,
+        0.0,            0.0,            1.0,
+    );
+    mat
+}
+
+fn warp_params(mat: Mat3) -> Vec6 {
+    Vec6::new(
+        mat.m11 - 1.0,
+        mat.m21,
+        mat.m12,
+        mat.m22 - 1.0,
+        mat.m13,
+        mat.m23,
+    )
 }
