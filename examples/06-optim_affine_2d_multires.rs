@@ -40,6 +40,7 @@ fn run() -> Result<(), f32> {
     // Multi-resolution optimization
     let mut model = Vec6::zeros();
     for lvl in (0..grad_multires.len()).rev() {
+        println!("---------------- Level {}:", lvl + 1);
         model.a = 2.0 * model.a;
         model.b = 2.0 * model.b;
         let obs = Obs {
@@ -55,6 +56,7 @@ fn run() -> Result<(), f32> {
     }
 
     // Final (full-res) optimization
+    println!("---------------- Level {}:", 0);
     let template = &tmp_multires[0];
     let image = &img_multires[0];
     let (grad_x, grad_y) = gradient(template);
@@ -155,6 +157,7 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Vec6, PreEval, LMPartialState, f32> f
                 y = 0;
             }
         }
+        energy = energy / residuals.len() as f32;
         (inside_indices, residuals, energy)
     }
 
@@ -182,13 +185,13 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Vec6, PreEval, LMPartialState, f32> f
     }
 
     fn stop_criterion(nb_iter: usize, s0: LMState, s1: LMPartialState) -> (LMState, Continue) {
-        let too_many_iterations = nb_iter > 4;
+        let too_many_iterations = nb_iter > 20;
         match (s1, too_many_iterations) {
             // Max number of iterations reached:
             (Err(_), true) => (s0, Continue::Stop),
             (Ok(data), true) => {
-                // println!("Warp: {}", data.model);
-                println!("Warp: {}", data.energy);
+                println!("Energy: {}", data.energy);
+                println!("Gradient norm: {}", data.gradient.norm());
                 let kept_state = LMState {
                     lm_coef: s0.lm_coef, // does not matter actually
                     data: data,
@@ -203,13 +206,21 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Vec6, PreEval, LMPartialState, f32> f
                 (kept_state, Continue::Forward)
             }
             (Ok(data), false) => {
-                // println!("Warp: {}", data.model);
-                println!("Warp: {}", data.energy);
+                let d_energy = s0.data.energy - data.energy;
+                let gradient_norm = data.gradient.norm();
+                // 1.0 is totally empiric here
+                let continuation = if d_energy > 1.0 {
+                    Continue::Forward
+                } else {
+                    Continue::Stop
+                };
+                println!("Energy: {}", data.energy);
+                println!("Gradient norm: {}", gradient_norm);
                 let kept_state = LMState {
                     lm_coef: 0.1 * s0.lm_coef,
                     data: data,
                 };
-                (kept_state, Continue::Forward)
+                (kept_state, continuation)
             }
         }
     }
