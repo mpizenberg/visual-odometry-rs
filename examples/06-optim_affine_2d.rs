@@ -99,7 +99,7 @@ impl Optimizer<Obs, LMState, Vec6, Vec6, PreEval, LMPartialState, f32> for LMOpt
     fn apply_step(delta: Vec6, model: &Vec6) -> Vec6 {
         let delta_warp = Affine2::from_matrix_unchecked(warp_mat(delta));
         let old_warp = Affine2::from_matrix_unchecked(warp_mat(model.clone()));
-        warp_params((old_warp * delta_warp.inverse()).unwrap())
+        warp_params((old_warp * delta_warp.inverse()).into_inner())
     }
 
     fn pre_eval(obs: &Obs, model: &Vec6) -> PreEval {

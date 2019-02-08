@@ -10,10 +10,9 @@ use cv::candidates;
 use cv::eval;
 use cv::helper;
 use cv::icl_nuim;
-use cv::inverse_depth;
+use cv::inverse_depth::{self, InverseDepth};
 use cv::multires;
 
-use inverse_depth::InverseDepth;
 use na::DMatrix;
 
 const OUT_DIR: &str = "out/example/multires_depth_strategy/";

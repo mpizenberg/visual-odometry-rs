@@ -90,7 +90,7 @@ pub fn exp(xi: Twist) -> Isometry3<Float> {
             real_factor,
             imag_factor * xi.w,
         ));
-        Isometry3::from_parts(Translation3::from_vector(v * xi.v), rotation)
+        Isometry3::from_parts(Translation3::from(v * xi.v), rotation)
     } else {
         let theta = theta_2.sqrt();
         let half_theta = 0.5 * theta;
@@ -103,7 +103,7 @@ pub fn exp(xi: Twist) -> Isometry3<Float> {
             real_factor,
             imag_factor * xi.w,
         ));
-        Isometry3::from_parts(Translation3::from_vector(v * xi.v), rotation)
+        Isometry3::from_parts(Translation3::from(v * xi.v), rotation)
     }
 }
 

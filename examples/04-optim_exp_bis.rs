@@ -4,7 +4,7 @@ extern crate rand;
 
 use cv::optimization_bis::{Continue, Optimizer, State};
 use na::DVector;
-use rand::{distributions::Uniform, SeedableRng, StdRng};
+use rand::{distributions::Uniform, rngs::StdRng, SeedableRng};
 use std::f32;
 
 type Vect = DVector<f32>;
@@ -89,7 +89,7 @@ impl Optimizer<Obs, GNState, f32, f32, PreEval, GNPartialState, f32> for GNOptim
     }
 
     fn compute_step(state: &GNState) -> f32 {
-        (state.jacobian.clone().pseudo_inverse(0.0) * &state.residuals).x
+        (state.jacobian.clone().pseudo_inverse(0.0).unwrap() * &state.residuals).x
     }
 
     fn apply_step(delta: f32, model: &f32) -> f32 {

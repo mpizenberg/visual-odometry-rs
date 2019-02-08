@@ -5,7 +5,8 @@ extern crate rand;
 use cv::optimization::{Continue, QuasiNewtonOptimizer, State};
 use na::{DVector, Matrix1};
 use rand::distributions::Uniform;
-use rand::{SeedableRng, StdRng};
+use rand::rngs::StdRng;
+use rand::SeedableRng;
 
 type Vect = DVector<f32>;
 type Scalar = Matrix1<f32>;
@@ -130,7 +131,7 @@ fn stop_criterion_levenberg_marquardt(
 // Gauss-Newton specific #############################################
 
 fn step_gauss_newton(state: &GNState) -> Scalar {
-    state.jacobian.clone().pseudo_inverse(0.0) * &state.residuals
+    state.jacobian.clone().pseudo_inverse(0.0).unwrap() * &state.residuals
 }
 
 fn stop_criterion_gauss_newton(
