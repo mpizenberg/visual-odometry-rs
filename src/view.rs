@@ -10,6 +10,21 @@ use crate::inverse_depth::{self, InverseDepth};
 
 pub type Float = f32;
 
+// Create an RGB image containing the gray image
+// and Candidates points overimposed with a given color.
+pub fn candidates_on_image(img: &DMatrix<u8>, candidates: &DMatrix<bool>) -> RgbImage {
+    let rgb_mat = img.zip_map(candidates, |i, a| fuse_img_with_color(i, (255, 0, 0), a));
+    interop::rgb_from_matrix(&rgb_mat)
+}
+
+fn fuse_img_with_color(intensity: u8, color: (u8, u8, u8), apply: bool) -> (u8, u8, u8) {
+    if apply {
+        color
+    } else {
+        (intensity, intensity, intensity)
+    }
+}
+
 // Create an RGB image of an inverse depth map.
 pub fn idepth_image(idepth_map: &DMatrix<InverseDepth>) -> RgbImage {
     let viridis = &colormap::viridis_u8()[0..256];
