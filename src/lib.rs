@@ -22,6 +22,8 @@ pub mod se3;
 pub mod so3;
 pub mod view;
 
+pub mod dso;
+
 // Test dependencies
 
 #[cfg(test)]
