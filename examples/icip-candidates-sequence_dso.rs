@@ -1,7 +1,7 @@
 extern crate computer_vision_rs as cv;
 extern crate nalgebra as na;
 
-use cv::dso::candidates::{self, BlockConfig, RecursiveConfig, RegionConfig};
+use cv::dso::candidates;
 use cv::icl_nuim;
 use cv::view;
 
@@ -31,31 +31,15 @@ fn main() {
 }
 
 fn generate_candidates(img: &DMatrix<u8>) -> DMatrix<bool> {
-    // Compute pyramid of gradients (without first level).
+    // Compute gradients norm of the image.
     let gradients = grad_squared_norm(img).map(|g2| (g2 as f32).sqrt() as u16);
 
     // Choose candidates based on gradients norms.
-    let region_config = RegionConfig {
-        size: 32,
-        threshold_coefs: (1.0, 3), // (2.0, 3) in dso and (1.0, 7) in ldso
-    };
-    let block_config = BlockConfig {
-        base_size: 4,
-        nb_levels: 3,
-        threshold_factor: 0.5,
-    };
-    let recursive_config = RecursiveConfig {
-        nb_iterations_left: 1,
-        low_thresh: 0.8,
-        high_thresh: 4.0,
-        random_thresh: 1.1,
-    };
-
     let candidate_points = candidates::select(
         &gradients,
-        region_config,
-        block_config,
-        recursive_config,
+        candidates::DEFAULT_REGION_CONFIG,
+        candidates::DEFAULT_BLOCK_CONFIG,
+        candidates::DEFAULT_RECURSIVE_CONFIG,
         2000,
     );
     // let final_nb_candidates = candidate_points.fold(0, |sum, x| if x { sum + 1 } else { sum });

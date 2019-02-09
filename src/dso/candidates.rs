@@ -19,9 +19,20 @@ pub trait Number<T>:
 
 impl Number<u16> for u16 {}
 
+/// 0: not picked
+/// n: picked at level n
+type Picked = u8;
+
 pub struct RegionConfig<T> {
     pub size: usize,
     pub threshold_coefs: (f32, T),
+}
+
+#[derive(Copy, Clone)]
+pub struct BlockConfig {
+    pub base_size: usize,
+    pub nb_levels: usize,
+    pub threshold_factor: f32,
 }
 
 pub struct RecursiveConfig {
@@ -30,6 +41,24 @@ pub struct RecursiveConfig {
     pub high_thresh: f32,
     pub random_thresh: f32,
 }
+
+pub const DEFAULT_REGION_CONFIG: RegionConfig<u16> = RegionConfig {
+    size: 32,
+    threshold_coefs: (1.0, 3), // (2.0, 3) in dso and (1.0, 3) in ldso
+};
+
+pub const DEFAULT_BLOCK_CONFIG: BlockConfig = BlockConfig {
+    base_size: 4,
+    nb_levels: 3,
+    threshold_factor: 0.5,
+};
+
+pub const DEFAULT_RECURSIVE_CONFIG: RecursiveConfig = RecursiveConfig {
+    nb_iterations_left: 1,
+    low_thresh: 0.8,
+    high_thresh: 4.0,
+    random_thresh: 1.1,
+};
 
 // Select a subset of points satisfying two conditions:
 //   * points shall be well-distributed in the image.
@@ -94,17 +123,6 @@ pub fn select<T: Number<T>>(
 
 fn to_mask(picked: DMatrix<u8>) -> DMatrix<bool> {
     picked.map(|p| p > 0)
-}
-
-/// 0: not picked
-/// n: picked at level n
-type Picked = u8;
-
-#[derive(Copy, Clone)]
-pub struct BlockConfig {
-    pub base_size: usize,
-    pub nb_levels: usize,
-    pub threshold_factor: f32,
 }
 
 fn pick_all_block_candidates<T: Number<T>>(
