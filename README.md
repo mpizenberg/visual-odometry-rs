@@ -158,3 +158,32 @@ Same as previous. One difference, we compute gradients at each resolution
 with the image at the same resolution.
 This is different from the previous one,
 where we use the image at higher resolution to compute the gradient.
+
+### 07-optim_camera_tracking.rs
+
+In this example, we also use an inverse compositional image alignment,
+but this time, with a 3D warping function, modelizing a camera motion.
+We take as input an RGB-D "template" and an RGB "image".
+A multi-resolution approach is taken to improve convergence rate and performance.
+
+## ICIP Examples
+
+Another set of examples is present in the `examples/` directory.
+They all start with the `icip-` prefix.
+Those are examples used to generate data to write an article for a conference.
+We didn't make it for the ICIP deadline,
+but I'll keep the prefix for the time being.
+
+### 01-candidates_sequence.rs
+
+Generate the candidates masks for each image of the dataset,
+and save visualization of the masks.
+The candidates are generated with our candidates method.
+
+### 01-candidates_sequence_dso.rs
+
+Same as previous but using DSO's candidates selection method.
+
+### 02-tracking_dso.rs
+
+Same as the normal example 07-optim ... but using DSO's candidates points.
