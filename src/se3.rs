@@ -130,6 +130,7 @@ pub fn log(iso: Isometry3<Float>) -> Twist {
             let alpha = real_factor.abs() / imag_norm;
             real_factor.signum() * (PI - 2.0 * alpha) // TAYLOR
         } else {
+            // Is this correct? should I use atan2 instead?
             2.0 * (imag_norm / real_factor).atan()
         };
         let theta_2 = theta * theta;

@@ -60,6 +60,8 @@ pub fn exp(w: Element) -> UnitQuaternion<Float> {
         real_factor = half_theta.cos();
         imag_factor = half_theta.sin() / theta;
     }
+    // This is actually already a unit quaternion so we should not use
+    // the from_quaternion function that performs a renormalization.
     UnitQuaternion::from_quaternion(Quaternion::from_parts(real_factor, imag_factor * w))
 }
 
@@ -79,6 +81,7 @@ pub fn log(rotation: UnitQuaternion<Float>) -> Element {
         (theta / imag_norm) * imag_vector
     } else {
         let imag_norm = imag_norm_2.sqrt();
+        // Is atan correct? should I use atan2 instead?
         let theta = 2.0 * (imag_norm / real_factor).atan();
         (theta / imag_norm) * imag_vector
     }
