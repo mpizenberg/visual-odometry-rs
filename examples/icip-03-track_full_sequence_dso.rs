@@ -13,20 +13,20 @@ use cv::se3;
 
 use itertools::izip;
 use na::{DMatrix, Isometry3, Matrix6, Point2, UnitQuaternion, Vector6};
-use std::fs;
-use std::{error::Error, f32};
+use std::{env, error::Error, f32, fs};
 
 fn main() {
-    if let Err(error) = run() {
+    let args: Vec<String> = env::args().collect();
+    if let Err(error) = run(args) {
         println!("{:?}", error);
     }
 }
 
-fn run() -> Result<(), Box<Error>> {
+fn run(args: Vec<String>) -> Result<(), Box<Error>> {
     // Main parameters
-    let start_tracking = 1;
-    let end_tracking_excluded = 100;
-    let frame_diff = 5;
+    let start_tracking: usize = args[1].parse()?;
+    let end_tracking_excluded: usize = args[2].parse()?;
+    let frame_diff: usize = args[3].parse()?;
     let nb_levels = 6;
 
     // csv file to save data
