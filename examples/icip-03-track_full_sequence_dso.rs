@@ -43,9 +43,6 @@ fn run() -> Result<(), Box<Error>> {
         "nb_levels",
         "translation_error",
         "rotation_error",
-        "rotation_angle_gt",
-        "rotation_angle",
-        "angle_to",
     ];
     let mut writer = csv::Writer::from_path(csv_file)?;
     writer.write_record(csv_header)?;
@@ -83,7 +80,7 @@ fn run() -> Result<(), Box<Error>> {
         let mut motion_error = model.inverse() * ext_gt;
         motion_error.rotation = re_normalize(motion_error.rotation);
         let translation_error = motion_error.translation.vector.norm();
-        let rotation_error = motion_error.rotation.angle();
+        let rotation_error = angle(motion_error.rotation);
 
         let fields = &[
             tmp_id.to_string(),
@@ -92,9 +89,6 @@ fn run() -> Result<(), Box<Error>> {
             nb_levels.to_string(),
             translation_error.to_string(),
             rotation_error.to_string(),
-            ext_gt.rotation.angle().to_string(),
-            model.rotation.angle().to_string(),
-            model.rotation.angle_to(&ext_gt.rotation).to_string(),
         ];
         writer.write_record(fields)?;
     }
@@ -324,6 +318,11 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Iso3, PreEval, LMPartialState, f32> f
 }
 
 // Helper ######################################################################
+
+fn angle(uq: UnitQuaternion<f32>) -> f32 {
+    let w = uq.into_inner().scalar();
+    2.0 * uq.into_inner().vector().norm().atan2(w)
+}
 
 fn re_normalize(uq: UnitQuaternion<f32>) -> UnitQuaternion<f32> {
     let q = uq.into_inner();
