@@ -11,7 +11,7 @@ use cv::multires;
 use cv::optimization_bis::{Continue, Optimizer, State};
 use cv::se3;
 use itertools::izip;
-use na::{DMatrix, Matrix6, Point2, Vector6};
+use na::{DMatrix, Isometry3, Matrix6, Point2, UnitQuaternion, Vector6};
 use std::{error::Error, f32};
 
 fn main() {
@@ -20,8 +20,8 @@ fn main() {
 
 fn run() -> Result<(), Box<Error>> {
     // Main parameters
-    let tmp_id = 40;
-    let img_id = 45;
+    let tmp_id = 60;
+    let img_id = 79;
     let nb_levels = 6;
     let candidates_diff_threshold = 7;
 
@@ -81,7 +81,7 @@ fn run() -> Result<(), Box<Error>> {
     let hessians_multires: Vec<_> = jacobians_multires.iter().map(hessians_vec).collect();
 
     // Multi-resolution optimization
-    let mut model = Vec6::zeros();
+    let mut model = Iso3::identity();
     for lvl in (0..hessians_multires.len()).rev() {
         println!("---------------- Level {}:", lvl);
         let obs = Obs {
@@ -106,18 +106,22 @@ fn run() -> Result<(), Box<Error>> {
         }
     }
 
-    println!(
-        "Final motion: {}",
-        se3::exp(se3::from_vector(model)).to_homogeneous()
-    );
+    println!("Final motion: {}", model.to_homogeneous());
 
-    // Compare with ground truth
-    let img_cam_multires =
-        Camera::new(INTRINSICS, all_extrinsics[img_id - 1].clone()).multi_res(nb_levels);
+    // Ground truth transformation
     let extrinsics_1 = tmp_cam_multires[0].extrinsics;
-    let extrinsics_2 = img_cam_multires[0].extrinsics;
+    let extrinsics_2 = all_extrinsics[img_id - 1];
     let ext_gt = extrinsics_2.inverse() * extrinsics_1;
     println!("Ground truth: {}", ext_gt.to_homogeneous());
+
+    // Error on transformation
+    let mut motion_error = model.inverse() * ext_gt;
+    motion_error.rotation = re_normalize(motion_error.rotation);
+    let translation_error = motion_error.translation.vector.norm();
+    let rotation_error = angle(motion_error.rotation);
+    println!("Translation error: {}", translation_error);
+    println!("Rotation error: {}", rotation_error);
+
     Ok(())
 }
 
@@ -130,7 +134,7 @@ struct LMData {
     hessian: Mat6,
     gradient: Vec6,
     energy: f32,
-    model: Vec6,
+    model: Iso3,
 }
 type LMPartialState = Result<LMData, f32>;
 type PreEval = (Vec<usize>, Vec<f32>, f32);
@@ -145,9 +149,10 @@ struct Obs<'a> {
 }
 type Vec6 = Vector6<f32>;
 type Mat6 = Matrix6<f32>;
+type Iso3 = Isometry3<f32>;
 
-impl State<Vec6, f32> for LMState {
-    fn model(&self) -> &Vec6 {
+impl State<Iso3, f32> for LMState {
+    fn model(&self) -> &Iso3 {
         &self.data.model
     }
     fn energy(&self) -> f32 {
@@ -155,7 +160,7 @@ impl State<Vec6, f32> for LMState {
     }
 }
 
-impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Vec6, PreEval, LMPartialState, f32> for LMOptimizer {
+impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Iso3, PreEval, LMPartialState, f32> for LMOptimizer {
     fn initial_energy() -> f32 {
         f32::INFINITY
     }
@@ -171,14 +176,14 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Vec6, PreEval, LMPartialState, f32> f
         hessian.cholesky().map(|ch| ch.solve(&state.data.gradient))
     }
 
-    fn apply_step(delta: Vec6, model: &Vec6) -> Vec6 {
+    fn apply_step(delta: Vec6, model: &Iso3) -> Iso3 {
         let delta_warp = se3::exp(se3::from_vector(delta));
-        let old_warp = se3::exp(se3::from_vector(*model));
-        let new_warp = old_warp * delta_warp.inverse();
-        se3::to_vector(se3::log(new_warp))
+        let mut not_normalized = model * delta_warp.inverse();
+        not_normalized.rotation = re_normalize(not_normalized.rotation);
+        not_normalized
     }
 
-    fn pre_eval(obs: &Obs, model: &Vec6) -> PreEval {
+    fn pre_eval(obs: &Obs, model: &Iso3) -> PreEval {
         let mut inside_indices = Vec::new();
         let mut residuals = Vec::new();
         let mut energy = 0.0;
@@ -199,7 +204,7 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Vec6, PreEval, LMPartialState, f32> f
         (inside_indices, residuals, energy)
     }
 
-    fn eval(obs: &Obs, energy: f32, pre_eval: PreEval, model: Vec6) -> LMPartialState {
+    fn eval(obs: &Obs, energy: f32, pre_eval: PreEval, model: Iso3) -> LMPartialState {
         let (inside_indices, residuals, new_energy) = pre_eval;
         if new_energy > energy {
             Err(new_energy)
@@ -265,6 +270,17 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Vec6, PreEval, LMPartialState, f32> f
 }
 
 // Helper ######################################################################
+
+fn angle(uq: UnitQuaternion<f32>) -> f32 {
+    let w = uq.into_inner().scalar();
+    2.0 * uq.into_inner().vector().norm().atan2(w)
+}
+
+fn re_normalize(uq: UnitQuaternion<f32>) -> UnitQuaternion<f32> {
+    let q = uq.into_inner();
+    let sq_norm = q.norm_squared();
+    UnitQuaternion::new_unchecked(0.5 * (3.0 - sq_norm) * q)
+}
 
 fn im_gradient(im: &DMatrix<u8>) -> (DMatrix<i16>, DMatrix<i16>) {
     let (nb_rows, nb_cols) = im.shape();
@@ -375,10 +391,9 @@ fn hessians_vec(jacobians: &Vec<Vec6>) -> Vec<Mat6> {
     jacobians.iter().map(|j| j * j.transpose()).collect()
 }
 
-fn warp(model: &Vec6, x: f32, y: f32, _z: f32, intrinsics: &Intrinsics) -> (f32, f32) {
+fn warp(model: &Iso3, x: f32, y: f32, _z: f32, intrinsics: &Intrinsics) -> (f32, f32) {
     let x1 = intrinsics.back_project(Point2::new(x, y), 1.0 / _z);
-    let twist = se3::from_vector(*model);
-    let x2 = se3::exp(twist) * x1;
+    let x2 = model * x1;
     let uvz2 = intrinsics.project(x2);
     (uvz2.x / uvz2.z, uvz2.y / uvz2.z)
 }
