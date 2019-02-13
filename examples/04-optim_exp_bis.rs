@@ -88,8 +88,13 @@ impl Optimizer<Obs, GNState, f32, f32, PreEval, GNPartialState, f32> for GNOptim
         f32::INFINITY
     }
 
-    fn compute_step(state: &GNState) -> f32 {
-        (state.jacobian.clone().pseudo_inverse(0.0).unwrap() * &state.residuals).x
+    fn compute_step(state: &GNState) -> Option<f32> {
+        state
+            .jacobian
+            .clone()
+            .pseudo_inverse(0.0)
+            .ok()
+            .map(|m| (m * &state.residuals).x)
     }
 
     fn apply_step(delta: f32, model: &f32) -> f32 {
@@ -163,9 +168,9 @@ impl Optimizer<Obs, LMState, f32, f32, PreEval, LMPartialState, f32> for LMOptim
         f32::INFINITY
     }
 
-    fn compute_step(state: &LMState) -> f32 {
+    fn compute_step(state: &LMState) -> Option<f32> {
         let hessian = (1.0 + state.lm_coef) * state.data.hessian;
-        state.data.gradient / hessian
+        Some(state.data.gradient / hessian)
     }
 
     fn apply_step(delta: f32, model: &f32) -> f32 {

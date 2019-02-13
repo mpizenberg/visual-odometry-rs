@@ -13,7 +13,7 @@ where
     S: State<Model, E>,
 {
     fn initial_energy() -> E;
-    fn compute_step(state: &S) -> Delta;
+    fn compute_step(state: &S) -> Option<Delta>;
     fn apply_step(delta: Delta, model: &Model) -> Model;
     fn pre_eval(obs: &Observations, model: &Model) -> PreEval;
     fn eval(obs: &Observations, energy: E, pre_eval: PreEval, model: Model) -> PartialState;
@@ -24,19 +24,23 @@ where
         Self::eval(obs, Self::initial_energy(), pre_eval, model)
     }
 
-    fn iterative(obs: &Observations, mut state: S) -> (S, usize) {
+    fn iterative(obs: &Observations, mut state: S) -> Option<(S, usize)> {
         let mut nb_iter = 0;
         loop {
             nb_iter = nb_iter + 1;
-            let delta = Self::compute_step(&state);
-            let new_model = Self::apply_step(delta, state.model());
-            let pre_eval = Self::pre_eval(obs, &new_model);
-            let partial_new_state = Self::eval(obs, state.energy(), pre_eval, new_model);
-            let (kept_state, continuation) =
-                Self::stop_criterion(nb_iter, state, partial_new_state);
-            state = kept_state;
-            if let Continue::Stop = continuation {
-                return (state, nb_iter);
+            match Self::compute_step(&state) {
+                Some(delta) => {
+                    let new_model = Self::apply_step(delta, state.model());
+                    let pre_eval = Self::pre_eval(obs, &new_model);
+                    let partial_new_state = Self::eval(obs, state.energy(), pre_eval, new_model);
+                    let (kept_state, continuation) =
+                        Self::stop_criterion(nb_iter, state, partial_new_state);
+                    state = kept_state;
+                    if let Continue::Stop = continuation {
+                        return Some((state, nb_iter));
+                    }
+                }
+                None => return None,
             }
         }
     }

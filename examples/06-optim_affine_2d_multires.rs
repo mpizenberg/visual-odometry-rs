@@ -26,7 +26,7 @@ fn run() -> Result<(), f32> {
     let img_multires = multires::mean_pyramid(5, img);
 
     // Precompute template gradients
-    let grad_multires = multires::gradients_xy(&tmp_multires);
+    let grad_multires: Vec<_> = tmp_multires.iter().map(gradient).collect();
 
     // Precompute the Jacobians (cf baker unify)
     let jacobians_multires: Vec<_> = grad_multires
@@ -40,40 +40,27 @@ fn run() -> Result<(), f32> {
     // Multi-resolution optimization
     let mut model = Vec6::zeros();
     for lvl in (0..grad_multires.len()).rev() {
-        println!("---------------- Level {}:", lvl + 1);
+        println!("---------------- Level {}:", lvl);
         model.a = 2.0 * model.a;
         model.b = 2.0 * model.b;
         let obs = Obs {
-            template: &tmp_multires[lvl + 1],
-            image: &img_multires[lvl + 1],
+            template: &tmp_multires[lvl],
+            image: &img_multires[lvl],
             jacobians: &jacobians_multires[lvl],
             hessians: &hessians_multires[lvl],
         };
         let data = LMOptimizer::init(&obs, model)?;
         let state = LMState { lm_coef: 0.1, data };
-        let (state, _) = LMOptimizer::iterative(&obs, state);
-        model = state.data.model;
+        match LMOptimizer::iterative(&obs, state) {
+            Some((state, _)) => {
+                model = state.data.model;
+            }
+            None => {
+                println!("Tracking was lost");
+                return Ok(());
+            }
+        }
     }
-
-    // Final (full-res) optimization
-    println!("---------------- Level {}:", 0);
-    let template = &tmp_multires[0];
-    let image = &img_multires[0];
-    let (grad_x, grad_y) = gradient(template);
-    let jacobians = affine_jacobians(&grad_x, &grad_y);
-    let hessians = hessians_vec(&jacobians);
-    let obs = Obs {
-        template,
-        image,
-        jacobians: &jacobians,
-        hessians: &hessians,
-    };
-    model.a = 2.0 * model.a;
-    model.b = 2.0 * model.b;
-    let data = LMOptimizer::init(&obs, model)?;
-    let state = LMState { lm_coef: 0.1, data };
-    let (state, _) = LMOptimizer::iterative(&obs, state);
-    model = state.data.model;
 
     println!("Final model: {}", warp_mat(model));
     Ok(())
@@ -116,7 +103,7 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Vec6, PreEval, LMPartialState, f32> f
         f32::INFINITY
     }
 
-    fn compute_step(state: &LMState) -> Vec6 {
+    fn compute_step(state: &LMState) -> Option<Vec6> {
         let mut hessian = state.data.hessian.clone();
         hessian.m11 = (1.0 + state.lm_coef) * hessian.m11;
         hessian.m22 = (1.0 + state.lm_coef) * hessian.m22;
@@ -124,7 +111,7 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Vec6, PreEval, LMPartialState, f32> f
         hessian.m44 = (1.0 + state.lm_coef) * hessian.m44;
         hessian.m55 = (1.0 + state.lm_coef) * hessian.m55;
         hessian.m66 = (1.0 + state.lm_coef) * hessian.m66;
-        hessian.cholesky().unwrap().solve(&state.data.gradient)
+        hessian.cholesky().map(|ch| ch.solve(&state.data.gradient))
     }
 
     fn apply_step(delta: Vec6, model: &Vec6) -> Vec6 {

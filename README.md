@@ -152,13 +152,6 @@ With those improvements, the optimization converges with roughly 10 iterations
 at level 5, followed by 3 iterations at each other level.
 This is a huge performance improvement.
 
-### 06-optim_affine_2d_multires_bis.rs
-
-Same as previous. One difference, we compute gradients at each resolution
-with the image at the same resolution.
-This is different from the previous one,
-where we use the image at higher resolution to compute the gradient.
-
 ### 07-optim_camera_tracking.rs
 
 In this example, we also use an inverse compositional image alignment,

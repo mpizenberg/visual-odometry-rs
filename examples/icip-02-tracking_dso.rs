@@ -97,8 +97,15 @@ fn run() -> Result<(), Box<Error>> {
         };
         let data = LMOptimizer::init(&obs, model).unwrap();
         let state = LMState { lm_coef: 0.1, data };
-        let (state, _) = LMOptimizer::iterative(&obs, state);
-        model = state.data.model;
+        match LMOptimizer::iterative(&obs, state) {
+            Some((state, _)) => {
+                model = state.data.model;
+            }
+            None => {
+                println!("Iterations did not converge!");
+                return Ok(());
+            }
+        }
     }
 
     println!(
@@ -155,7 +162,7 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Vec6, PreEval, LMPartialState, f32> f
         f32::INFINITY
     }
 
-    fn compute_step(state: &LMState) -> Vec6 {
+    fn compute_step(state: &LMState) -> Option<Vec6> {
         let mut hessian = state.data.hessian.clone();
         hessian.m11 = (1.0 + state.lm_coef) * hessian.m11;
         hessian.m22 = (1.0 + state.lm_coef) * hessian.m22;
@@ -163,7 +170,7 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Vec6, PreEval, LMPartialState, f32> f
         hessian.m44 = (1.0 + state.lm_coef) * hessian.m44;
         hessian.m55 = (1.0 + state.lm_coef) * hessian.m55;
         hessian.m66 = (1.0 + state.lm_coef) * hessian.m66;
-        hessian.cholesky().unwrap().solve(&state.data.gradient)
+        hessian.cholesky().map(|ch| ch.solve(&state.data.gradient))
     }
 
     fn apply_step(delta: Vec6, model: &Vec6) -> Vec6 {

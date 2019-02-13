@@ -75,11 +75,11 @@ impl Optimizer<(), LMState, Vec2, (f32, f32), PreEval, LMPartialState, f32> for 
         f32::INFINITY
     }
 
-    fn compute_step(state: &LMState) -> Vec2 {
+    fn compute_step(state: &LMState) -> Option<Vec2> {
         let mut hessian = state.data.hessian.clone();
         hessian.m11 = (1.0 + state.lm_coef) * hessian.m11;
         hessian.m22 = (1.0 + state.lm_coef) * hessian.m22;
-        hessian.cholesky().unwrap().solve(&state.data.gradient)
+        hessian.cholesky().map(|ch| ch.solve(&state.data.gradient))
     }
 
     fn apply_step(delta: Vec2, model: &(f32, f32)) -> (f32, f32) {
