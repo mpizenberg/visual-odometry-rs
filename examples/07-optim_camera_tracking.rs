@@ -18,11 +18,16 @@ fn main() {
     let _ = run();
 }
 
+const RESIDUAL_THRESHOLD: f32 = 40.0;
+const NB_LEVELS: usize = 7;
+const MAX_NB_ITER: usize = 20;
+const ENERGY_THRESHOLD: f32 = 0.1;
+
 fn run() -> Result<(), Box<Error>> {
     // Main parameters
-    let tmp_id = 60;
-    let img_id = 79;
-    let nb_levels = 6;
+    let tmp_id = 40;
+    let img_id = 45;
+    let nb_levels = NB_LEVELS;
     let candidates_diff_threshold = 7;
 
     // Preload all extrinsic camera parameters of the trajectory
@@ -195,9 +200,11 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Iso3, PreEval, LMPartialState, f32> f
                 // precompute residuals and energy
                 let tmp = obs.template[(y, x)];
                 let r = im - tmp as f32;
-                energy = energy + r * r;
-                residuals.push(r);
-                inside_indices.push(idx); // keep only inside points
+                if r.abs() < RESIDUAL_THRESHOLD {
+                    energy = energy + r * r;
+                    residuals.push(r);
+                    inside_indices.push(idx); // keep only inside points
+                }
             }
         }
         energy = energy / residuals.len() as f32;
@@ -228,7 +235,7 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Iso3, PreEval, LMPartialState, f32> f
     }
 
     fn stop_criterion(nb_iter: usize, s0: LMState, s1: LMPartialState) -> (LMState, Continue) {
-        let too_many_iterations = nb_iter > 20;
+        let too_many_iterations = nb_iter > MAX_NB_ITER;
         match (s1, too_many_iterations) {
             // Max number of iterations reached:
             (Err(_), true) => (s0, Continue::Stop),
@@ -252,7 +259,7 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Iso3, PreEval, LMPartialState, f32> f
                 let d_energy = s0.data.energy - data.energy;
                 let gradient_norm = data.gradient.norm();
                 // 1.0 is totally empiric here
-                let continuation = if d_energy > 1.0 {
+                let continuation = if d_energy > ENERGY_THRESHOLD {
                     Continue::Forward
                 } else {
                     Continue::Stop
