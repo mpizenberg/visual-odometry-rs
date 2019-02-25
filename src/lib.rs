@@ -23,6 +23,7 @@ pub mod so3;
 pub mod view;
 
 pub mod dso;
+pub mod tum_rgbd;
 
 // Test dependencies
 

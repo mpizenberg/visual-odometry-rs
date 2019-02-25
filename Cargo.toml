@@ -34,7 +34,7 @@ rand = "0.6"
 num-traits = "0.2"
 
 # Parsing files
-nom = "4"
+nom = "4.2"
 
 # More iterators
 itertools = "0.7"

@@ -5,7 +5,7 @@ extern crate nalgebra as na;
 
 use itertools::izip;
 use na::{DMatrix, Isometry3, Matrix6, Point2, UnitQuaternion, Vector6};
-use std::{env, error::Error, f32, fs, path::PathBuf};
+use std::{env, error::Error, f32, fs, io::BufReader, io::Read, path::PathBuf};
 
 use cv::camera::{self, Camera, Intrinsics};
 use cv::candidates;
@@ -16,6 +16,7 @@ use cv::inverse_depth::{self, InverseDepth};
 use cv::multires;
 use cv::optimization_bis::{Continue, Optimizer, State};
 use cv::se3;
+use cv::tum_rgbd;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -32,6 +33,7 @@ fn my_run(args: Vec<String>) -> Result<(), Box<Error>> {
 
     // Build a vector containing timestamps and full paths of images.
     let associations = parse_associations(valid_args.associations_file_path)?;
+    // println!("{:#?}", associations);
 
     // Initialize RGB-D tracker.
     let (tracker_config, mut tracker_state) = tracker_init(valid_args.intrinsics);
@@ -43,7 +45,7 @@ fn my_run(args: Vec<String>) -> Result<(), Box<Error>> {
         let depth_map = DMatrix::from_row_slice(h, w, depth_map_vec_u16.as_slice());
 
         // Load the rgb image.
-        let img = interop::matrix_from_image(image::open(&assoc.rgb_file_path)?.to_luma());
+        let img = interop::matrix_from_image(image::open(&assoc.color_file_path)?.to_luma());
 
         // Track the rgb-d image.
         tracker_state = track(&tracker_config, tracker_state, depth_map, img);
@@ -119,15 +121,12 @@ fn create_camera(camera_id: &str) -> Result<Intrinsics, String> {
     }
 }
 
-struct Assoc {
-    depth_timestamp: f64,
-    depth_file_path: PathBuf,
-    rgb_timestamp: f64,
-    rgb_file_path: PathBuf,
-}
-
-fn parse_associations(file_path: PathBuf) -> Result<Vec<Assoc>, String> {
-    unimplemented!();
+fn parse_associations(file_path: PathBuf) -> Result<Vec<tum_rgbd::Association>, Box<Error>> {
+    let file = fs::File::open(file_path)?;
+    let mut file_reader = BufReader::new(file);
+    let mut content = String::new();
+    file_reader.read_to_string(&mut content)?;
+    tum_rgbd::parse::associations(content).map_err(|s| s.into())
 }
 
 struct RgbdTrackerConfig {}
