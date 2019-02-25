@@ -61,7 +61,62 @@ struct Args {
 }
 
 fn check_args(args: Vec<String>) -> Result<Args, String> {
-    unimplemented!();
+    println!("{:?}", args);
+    match args.as_slice() {
+        [_, camera_id, associations_file_path_str] => {
+            let intrinsics = create_camera(camera_id)?;
+            let associations_file_path = PathBuf::from(associations_file_path_str);
+            if associations_file_path.is_file() {
+                Ok(Args {
+                    intrinsics,
+                    associations_file_path,
+                })
+            } else {
+                println!("{}", usage);
+                Err(format!(
+                    "The association file does not exist or is not reachable: {}",
+                    associations_file_path_str
+                ))
+            }
+        }
+        _ => {
+            println!("{}", usage);
+            Err("Wrong number of arguments".to_string())
+        }
+    }
+}
+
+fn create_camera(camera_id: &str) -> Result<Intrinsics, String> {
+    match camera_id {
+        "fr1" => Ok(Intrinsics {
+            principal_point: (318.643040, 255.313989),
+            focal_length: 1.0,
+            scaling: (517.306408, 516.469215),
+            skew: 0.0,
+        }),
+        "fr2" => Ok(Intrinsics {
+            principal_point: (325.141442, 249.701764),
+            focal_length: 1.0,
+            scaling: (520.908620, 521.007327),
+            skew: 0.0,
+        }),
+        "fr3" => Ok(Intrinsics {
+            principal_point: (320.106653, 247.632132),
+            focal_length: 1.0,
+            scaling: (535.433105, 539.212524),
+            skew: 0.0,
+        }),
+        "icl" => Ok(Intrinsics {
+            principal_point: (319.5, 239.5),
+            focal_length: 1.0,
+            scaling: (481.2, -480.0),
+            skew: 0.0,
+        }),
+        _ => {
+            println!("{}", usage);
+            Err(format!("Unknown camera id: {}", camera_id))
+        }
+    }
 }
 
 struct Assoc {
