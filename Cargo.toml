@@ -50,3 +50,10 @@ approx = "0.3"
 
 # CSV
 csv = "1"
+
+# Benchmarks
+criterion = "0.2"
+
+[[bench]]
+name = "png_read"
+harness = false
