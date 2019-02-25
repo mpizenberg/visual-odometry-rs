@@ -15,6 +15,17 @@ pub struct Association {
     pub color_file_path: String,
 }
 
+impl std::string::ToString for Frame {
+    fn to_string(&self) -> String {
+        let t = self.pose.translation.vector;
+        let q = self.pose.rotation.into_inner().coords;
+        format!(
+            "{} {} {} {} {} {} {} {}",
+            self.timestamp, t.x, t.y, t.z, q.x, q.y, q.z, q.w
+        )
+    }
+}
+
 pub mod parse {
     use super::*;
     use nom::{

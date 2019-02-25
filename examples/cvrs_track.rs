@@ -51,7 +51,7 @@ fn my_run(args: Vec<String>) -> Result<(), Box<Error>> {
         tracker_state = track(&tracker_config, tracker_state, depth_map, img);
 
         // Print to stdout the frame pose.
-        println!("{}", tum_rgbd_format(&tracker_state.current_pose));
+        println!("{}", tum_rgbd_format(&tracker_state.current_frame));
     }
 
     Ok(())
@@ -132,7 +132,7 @@ fn parse_associations(file_path: PathBuf) -> Result<Vec<tum_rgbd::Association>, 
 struct RgbdTrackerConfig {}
 
 struct RgbdTrackerState {
-    current_pose: Isometry3<f32>,
+    current_frame: tum_rgbd::Frame,
 }
 
 fn tracker_init(intrinsics: Intrinsics) -> (RgbdTrackerConfig, RgbdTrackerState) {
@@ -148,8 +148,8 @@ fn track(
     unimplemented!();
 }
 
-fn tum_rgbd_format(pose: &Isometry3<f32>) -> String {
-    unimplemented!();
+fn tum_rgbd_format(frame: &tum_rgbd::Frame) -> String {
+    frame.to_string()
 }
 
 // REFERENCE ###################################################################
