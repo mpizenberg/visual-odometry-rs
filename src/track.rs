@@ -7,6 +7,16 @@ use crate::inverse_depth::{self, InverseDepth};
 use crate::optimization_bis::{self as optim, Optimizer};
 use crate::{candidates, helper, multires, se3};
 
+type Levels<T> = Vec<T>;
+type Vec6 = Vector6<f32>;
+type Mat6 = Matrix6<f32>;
+type Iso3 = Isometry3<f32>;
+
+pub struct Tracker {
+    config: Config,
+    state: State,
+}
+
 pub struct Config {
     pub nb_levels: usize,
     pub candidates_diff_threshold: u16,
@@ -15,14 +25,7 @@ pub struct Config {
 }
 
 pub struct State {
-    intrinsics_multires: Levels<Intrinsics>,
-    keyframe_img_multires: Levels<DMatrix<u8>>,
-    keyframe_gradients_multires: Levels<(DMatrix<i16>, DMatrix<i16>)>,
-    keyframe_gradients_squared_norm_multires: Levels<DMatrix<u16>>,
-    keyframe_candidates_points: DMatrix<bool>,
-    keyframe_usable_candidates_multires: Levels<(Vec<(usize, usize)>, Vec<f32>)>,
-    keyframe_jacobians_multires: Levels<Vec<Vec6>>,
-    keyframe_hessians_multires: Levels<Vec<Mat6>>,
+    keyframe_multires_data: MultiresData,
     keyframe_depth_timestamp: f64,
     keyframe_img_timestamp: f64,
     keyframe_pose: Iso3,
@@ -31,10 +34,16 @@ pub struct State {
     current_frame_pose: Iso3,
 }
 
-type Levels<T> = Vec<T>;
-type Vec6 = Vector6<f32>;
-type Mat6 = Matrix6<f32>;
-type Iso3 = Isometry3<f32>;
+struct MultiresData {
+    intrinsics_multires: Levels<Intrinsics>,
+    img_multires: Levels<DMatrix<u8>>,
+    gradients_multires: Levels<(DMatrix<i16>, DMatrix<i16>)>,
+    gradients_squared_norm_multires: Levels<DMatrix<u16>>,
+    candidates_points: DMatrix<bool>,
+    usable_candidates_multires: Levels<(Vec<(usize, usize)>, Vec<f32>)>,
+    jacobians_multires: Levels<Vec<Vec6>>,
+    hessians_multires: Levels<Vec<Mat6>>,
+}
 
 impl Config {
     pub fn init(
@@ -44,72 +53,16 @@ impl Config {
         keyframe_img_timestamp: f64,
         img: DMatrix<u8>,
     ) -> Tracker {
-        // Precompute multi-resolution intrinsics.
+        // Precompute multi-resolution first frame data.
         let intrinsics_multires = self.intrinsics.clone().multi_res(self.nb_levels);
-
-        // Precompute multi-resolution image of keyframe.
-        let keyframe_img_multires = multires::mean_pyramid(self.nb_levels, img);
-
-        // Precompute multi-resolution of keyframe gradients.
-        let mut keyframe_gradients_multires = multires::gradients_xy(&keyframe_img_multires);
-        keyframe_gradients_multires.insert(0, im_gradient(&keyframe_img_multires[0]));
-        let keyframe_gradients_squared_norm_multires: Vec<_> = keyframe_gradients_multires
-            .iter()
-            .map(|(gx, gy)| grad_squared_norm(gx, gy))
-            .collect();
-
-        // Precompute mask of candidate points for tracking.
-        let keyframe_candidates_points = candidates::select(
-            self.candidates_diff_threshold,
-            &keyframe_gradients_squared_norm_multires,
-        )
-        .pop()
-        .unwrap();
-
-        // Only keep the "usable" points, i.e. those with a known depth information.
-        let from_depth = |z| inverse_depth::from_depth(self.depth_scale, z);
-        let idepth_candidates = helper::zip_mask_map(
-            &depth_map,
-            &keyframe_candidates_points,
-            InverseDepth::Unknown,
-            from_depth,
-        );
-        let fuse = |a, b, c, d| inverse_depth::fuse(a, b, c, d, inverse_depth::strategy_dso_mean);
-        let idepth_multires = multires::limited_sequence(
-            self.nb_levels,
-            idepth_candidates,
-            |m| m,
-            |m| multires::halve(&m, fuse),
-        );
-        let keyframe_usable_candidates_multires: Levels<_> =
-            idepth_multires.iter().map(extract_z).collect();
-
-        // Precompute the Jacobians
-        let keyframe_jacobians_multires: Levels<Vec<Vec6>> = izip!(
-            &intrinsics_multires,
-            &keyframe_usable_candidates_multires,
-            &keyframe_gradients_multires,
-        )
-        .map(|(intrinsics, (coord, _z), (gx, gy))| warp_jacobians(intrinsics, coord, _z, gx, gy))
-        .collect();
-
-        // Precompute the Hessians
-        let keyframe_hessians_multires: Levels<_> = keyframe_jacobians_multires
-            .iter()
-            .map(hessians_vec)
-            .collect();
+        let img_multires = multires::mean_pyramid(self.nb_levels, img);
+        let keyframe_multires_data =
+            precompute_multires_data(&self, &depth_map, intrinsics_multires, img_multires);
 
         // Regroup everything under the returned Tracker.
         Tracker {
             state: State {
-                intrinsics_multires,
-                keyframe_img_multires,
-                keyframe_gradients_multires,
-                keyframe_gradients_squared_norm_multires,
-                keyframe_candidates_points,
-                keyframe_usable_candidates_multires,
-                keyframe_jacobians_multires,
-                keyframe_hessians_multires,
+                keyframe_multires_data,
                 keyframe_depth_timestamp,
                 keyframe_img_timestamp,
                 keyframe_pose: Iso3::identity(),
@@ -122,9 +75,68 @@ impl Config {
     }
 } // impl Config
 
-pub struct Tracker {
-    config: Config,
-    state: State,
+fn precompute_multires_data(
+    config: &Config,
+    depth_map: &DMatrix<u16>,
+    intrinsics_multires: Levels<Intrinsics>,
+    img_multires: Levels<DMatrix<u8>>,
+) -> MultiresData {
+    // Precompute multi-resolution of keyframe gradients.
+    let mut gradients_multires = multires::gradients_xy(&img_multires);
+    gradients_multires.insert(0, im_gradient(&img_multires[0]));
+    let gradients_squared_norm_multires: Vec<_> = gradients_multires
+        .iter()
+        .map(|(gx, gy)| grad_squared_norm(gx, gy))
+        .collect();
+
+    // Precompute mask of candidate points for tracking.
+    let candidates_points = candidates::select(
+        config.candidates_diff_threshold,
+        &gradients_squared_norm_multires,
+    )
+    .pop()
+    .unwrap();
+
+    // Only keep the "usable" points, i.e. those with a known depth information.
+    let from_depth = |z| inverse_depth::from_depth(config.depth_scale, z);
+    let idepth_candidates = helper::zip_mask_map(
+        &depth_map,
+        &candidates_points,
+        InverseDepth::Unknown,
+        from_depth,
+    );
+    let fuse = |a, b, c, d| inverse_depth::fuse(a, b, c, d, inverse_depth::strategy_dso_mean);
+    let idepth_multires = multires::limited_sequence(
+        config.nb_levels,
+        idepth_candidates,
+        |m| m,
+        |m| multires::halve(&m, fuse),
+    );
+    let usable_candidates_multires: Levels<_> = idepth_multires.iter().map(extract_z).collect();
+
+    // Precompute the Jacobians.
+    let jacobians_multires: Levels<Vec<Vec6>> = izip!(
+        &intrinsics_multires,
+        &usable_candidates_multires,
+        &gradients_multires,
+    )
+    .map(|(intrinsics, (coord, _z), (gx, gy))| warp_jacobians(intrinsics, coord, _z, gx, gy))
+    .collect();
+
+    // Precompute the Hessians.
+    let hessians_multires: Levels<_> = jacobians_multires.iter().map(hessians_vec).collect();
+
+    // Regroup everything under a MultiresData.
+    MultiresData {
+        intrinsics_multires,
+        img_multires,
+        gradients_multires,
+        gradients_squared_norm_multires,
+        candidates_points,
+        usable_candidates_multires,
+        jacobians_multires,
+        hessians_multires,
+    }
 }
 
 impl Tracker {
@@ -137,16 +149,17 @@ impl Tracker {
     ) {
         let mut lm_model = self.state.current_frame_pose.inverse() * self.state.keyframe_pose;
         let img_multires = multires::mean_pyramid(self.config.nb_levels, img);
+        let keyframe_data = &self.state.keyframe_multires_data;
         let mut optimization_went_well = true;
         for lvl in (0..self.config.nb_levels).rev() {
             let obs = Obs {
-                intrinsics: &self.state.intrinsics_multires[lvl],
-                template: &self.state.keyframe_img_multires[lvl],
+                intrinsics: &keyframe_data.intrinsics_multires[lvl],
+                template: &keyframe_data.img_multires[lvl],
                 image: &img_multires[lvl],
-                coordinates: &self.state.keyframe_usable_candidates_multires[lvl].0,
-                _z_candidates: &self.state.keyframe_usable_candidates_multires[lvl].1,
-                jacobians: &self.state.keyframe_jacobians_multires[lvl],
-                hessians: &self.state.keyframe_hessians_multires[lvl],
+                coordinates: &keyframe_data.usable_candidates_multires[lvl].0,
+                _z_candidates: &keyframe_data.usable_candidates_multires[lvl].1,
+                jacobians: &keyframe_data.jacobians_multires[lvl],
+                hessians: &keyframe_data.hessians_multires[lvl],
             };
             let data = LMOptimizer::init(&obs, lm_model).unwrap();
             let lm_state = LMState { lm_coef: 0.1, data };
@@ -155,16 +168,34 @@ impl Tracker {
                     lm_model = lm_state.data.model;
                 }
                 None => {
-                    println!("Iterations did not converge!");
+                    eprintln!("Iterations did not converge!");
                     optimization_went_well = false;
                     break;
                 }
             }
         }
+
+        // Update current frame info in tracker.
+        self.state.current_frame_depth_timestamp = depth_time;
+        self.state.current_frame_img_timestamp = img_time;
         if optimization_went_well {
-            self.state.current_frame_depth_timestamp = depth_time;
-            self.state.current_frame_img_timestamp = img_time;
             self.state.current_frame_pose = self.state.keyframe_pose * lm_model.inverse();
+        }
+
+        // Check if we need to change the keyframe.
+        let change_keyframe = true;
+
+        // In case of keyframe change, update all keyframe info with current frame.
+        if change_keyframe {
+            self.state.keyframe_multires_data = precompute_multires_data(
+                &self.config,
+                &depth_map,
+                keyframe_data.intrinsics_multires.clone(),
+                img_multires,
+            );
+            self.state.keyframe_depth_timestamp = depth_time;
+            self.state.keyframe_img_timestamp = img_time;
+            self.state.keyframe_pose = self.state.current_frame_pose;
         }
     }
 
@@ -287,8 +318,8 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Iso3, PreEval, LMPartialState, f32> f
             // Max number of iterations reached:
             (Err(_), true) => (s0, optim::Continue::Stop),
             (Ok(data), true) => {
-                // println!("Energy: {}", data.energy);
-                // println!("Gradient norm: {}", data.gradient.norm());
+                // eprintln!("Energy: {}", data.energy);
+                // eprintln!("Gradient norm: {}", data.gradient.norm());
                 let kept_state = LMState {
                     lm_coef: s0.lm_coef, // does not matter actually
                     data: data,
@@ -297,7 +328,7 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Iso3, PreEval, LMPartialState, f32> f
             }
             // Can continue to iterate:
             (Err(_energy), false) => {
-                // println!("\t back from: {}", energy);
+                // eprintln!("\t back from: {}", energy);
                 let mut kept_state = s0;
                 kept_state.lm_coef = 10.0 * kept_state.lm_coef;
                 (kept_state, optim::Continue::Forward)
@@ -311,8 +342,8 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Iso3, PreEval, LMPartialState, f32> f
                 } else {
                     optim::Continue::Stop
                 };
-                // println!("Energy: {}", data.energy);
-                // println!("Gradient norm: {}", gradient_norm);
+                // eprintln!("Energy: {}", data.energy);
+                // eprintln!("Gradient norm: {}", gradient_norm);
                 let kept_state = LMState {
                     lm_coef: 0.1 * s0.lm_coef,
                     data: data,

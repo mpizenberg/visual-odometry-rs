@@ -14,7 +14,7 @@ use cv::tum_rgbd;
 fn main() {
     let args: Vec<String> = env::args().collect();
     if let Err(error) = my_run(args) {
-        println!("{:?}", error);
+        eprintln!("{:?}", error);
     }
 }
 
@@ -63,7 +63,7 @@ struct Args {
 }
 
 fn check_args(args: Vec<String>) -> Result<Args, String> {
-    println!("{:?}", args);
+    // eprintln!("{:?}", args);
     match args.as_slice() {
         [_, camera_id, associations_file_path_str] => {
             let intrinsics = create_camera(camera_id)?;
@@ -74,7 +74,7 @@ fn check_args(args: Vec<String>) -> Result<Args, String> {
                     associations_file_path,
                 })
             } else {
-                println!("{}", USAGE);
+                eprintln!("{}", USAGE);
                 Err(format!(
                     "The association file does not exist or is not reachable: {}",
                     associations_file_path_str
@@ -82,7 +82,7 @@ fn check_args(args: Vec<String>) -> Result<Args, String> {
             }
         }
         _ => {
-            println!("{}", USAGE);
+            eprintln!("{}", USAGE);
             Err("Wrong number of arguments".to_string())
         }
     }
@@ -115,7 +115,7 @@ fn create_camera(camera_id: &str) -> Result<Intrinsics, String> {
             skew: 0.0,
         }),
         _ => {
-            println!("{}", USAGE);
+            eprintln!("{}", USAGE);
             Err(format!("Unknown camera id: {}", camera_id))
         }
     }
