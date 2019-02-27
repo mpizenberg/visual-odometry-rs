@@ -183,10 +183,25 @@ impl Tracker {
         }
 
         // Check if we need to change the keyframe.
-        let change_keyframe = true;
+        let (coordinates, _z_candidates) = keyframe_data.usable_candidates_multires.last().unwrap();
+        let intrinsics = keyframe_data.intrinsics_multires.last().unwrap();
+        let optical_flow_sum: f32 = _z_candidates
+            .iter()
+            .zip(coordinates.iter())
+            .map(|(&_z, &(x, y))| {
+                let (u, v) = warp(&lm_model, x as f32, y as f32, _z, intrinsics);
+                (x as f32 - u).abs() + (y as f32 - v).abs()
+            })
+            .sum();
+        let optical_flow = optical_flow_sum / _z_candidates.len() as f32;
+        eprintln!("Optical_flow: {}", optical_flow);
+
+        let change_keyframe = optical_flow >= 1.0;
 
         // In case of keyframe change, update all keyframe info with current frame.
         if change_keyframe {
+            let delta_time = depth_time - self.state.keyframe_depth_timestamp;
+            eprintln!("Changing keyframe after: {} seconds", delta_time);
             self.state.keyframe_multires_data = precompute_multires_data(
                 &self.config,
                 &depth_map,
