@@ -1,6 +1,8 @@
 extern crate nalgebra as na;
 extern crate nom;
 
+use std::path::PathBuf;
+
 #[derive(Debug)]
 pub struct Frame {
     pub timestamp: f64,
@@ -10,9 +12,9 @@ pub struct Frame {
 #[derive(Debug)]
 pub struct Association {
     pub depth_timestamp: f64,
-    pub depth_file_path: String,
+    pub depth_file_path: PathBuf,
     pub color_timestamp: f64,
-    pub color_file_path: String,
+    pub color_file_path: PathBuf,
 }
 
 impl std::string::ToString for Frame {
@@ -69,15 +71,15 @@ pub mod parse {
     named!(association<CompleteStr, Association>,
         do_parse!(
             depth_timestamp: double >> space >>
-            depth_file_path: word >> space >>
+            depth_file_path: path >> space >>
             color_timestamp: double >> space >>
-            color_file_path: word >>
+            color_file_path: path >>
             (Association { depth_timestamp, depth_file_path, color_timestamp, color_file_path })
         )
     );
 
-    named!(word<CompleteStr, String>,
-        map!(is_not!(" \t\r\n"), |s| (*s).to_string())
+    named!(path<CompleteStr, PathBuf>,
+        map!(is_not!(" \t\r\n"), |s| PathBuf::from(*s))
     );
 
     // Ground truth --------------------
