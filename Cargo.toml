@@ -1,5 +1,5 @@
 [package]
-name = "computer-vision-rs"
+name = "visual-odometry-rs"
 version = "0.1.0"
 authors = ["Matthieu Pizenberg <matthieu.pizenberg@gmail.com>"]
 edition = "2018"
