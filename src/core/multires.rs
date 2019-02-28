@@ -1,4 +1,4 @@
-use crate::gradient;
+use crate::core::gradient;
 use nalgebra::{DMatrix, Scalar};
 
 pub type Float = f32;

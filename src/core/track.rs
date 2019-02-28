@@ -2,15 +2,21 @@ use itertools::izip;
 use nalgebra::{DMatrix, Isometry3, Matrix6, Point2, UnitQuaternion, Vector6};
 use std::f32;
 
-use crate::camera::Intrinsics;
-use crate::inverse_depth::{self, InverseDepth};
-use crate::optimization_bis::{self as optim, Optimizer};
-use crate::{candidates, helper, multires, se3};
+use crate::core::{
+    camera::Intrinsics,
+    candidates,
+    inverse_depth::{self, InverseDepth},
+    multires,
+};
+use crate::math::optimizer::{self as optim, Optimizer};
+use crate::math::se3;
+use crate::misc::helper;
 
+pub type Float = f32;
 type Levels<T> = Vec<T>;
-type Vec6 = Vector6<f32>;
-type Mat6 = Matrix6<f32>;
-type Iso3 = Isometry3<f32>;
+type Vec6 = Vector6<Float>;
+type Mat6 = Matrix6<Float>;
+type Iso3 = Isometry3<Float>;
 
 pub struct Tracker {
     config: Config,
@@ -20,7 +26,7 @@ pub struct Tracker {
 pub struct Config {
     pub nb_levels: usize,
     pub candidates_diff_threshold: u16,
-    pub depth_scale: f32,
+    pub depth_scale: Float,
     pub intrinsics: Intrinsics,
 }
 
@@ -37,10 +43,7 @@ pub struct State {
 struct MultiresData {
     intrinsics_multires: Levels<Intrinsics>,
     img_multires: Levels<DMatrix<u8>>,
-    gradients_multires: Levels<(DMatrix<i16>, DMatrix<i16>)>,
-    gradients_squared_norm_multires: Levels<DMatrix<u16>>,
-    candidates_points: DMatrix<bool>,
-    usable_candidates_multires: Levels<(Vec<(usize, usize)>, Vec<f32>)>,
+    usable_candidates_multires: Levels<(Vec<(usize, usize)>, Vec<Float>)>,
     jacobians_multires: Levels<Vec<Vec6>>,
     hessians_multires: Levels<Vec<Mat6>>,
 }
@@ -130,9 +133,6 @@ fn precompute_multires_data(
     MultiresData {
         intrinsics_multires,
         img_multires,
-        gradients_multires,
-        gradients_squared_norm_multires,
-        candidates_points,
         usable_candidates_multires,
         jacobians_multires,
         hessians_multires,
@@ -185,15 +185,15 @@ impl Tracker {
         // Check if we need to change the keyframe.
         let (coordinates, _z_candidates) = keyframe_data.usable_candidates_multires.last().unwrap();
         let intrinsics = keyframe_data.intrinsics_multires.last().unwrap();
-        let optical_flow_sum: f32 = _z_candidates
+        let optical_flow_sum: Float = _z_candidates
             .iter()
             .zip(coordinates.iter())
             .map(|(&_z, &(x, y))| {
-                let (u, v) = warp(&lm_model, x as f32, y as f32, _z, intrinsics);
-                (x as f32 - u).abs() + (y as f32 - v).abs()
+                let (u, v) = warp(&lm_model, x as Float, y as Float, _z, intrinsics);
+                (x as Float - u).abs() + (y as Float - v).abs()
             })
             .sum();
-        let optical_flow = optical_flow_sum / _z_candidates.len() as f32;
+        let optical_flow = optical_flow_sum / _z_candidates.len() as Float;
         eprintln!("Optical_flow: {}", optical_flow);
 
         let change_keyframe = optical_flow >= 1.0;
@@ -226,38 +226,38 @@ impl Tracker {
 
 struct LMOptimizer;
 struct LMState {
-    lm_coef: f32,
+    lm_coef: Float,
     data: LMData,
 }
 struct LMData {
     hessian: Mat6,
     gradient: Vec6,
-    energy: f32,
+    energy: Float,
     model: Iso3,
 }
-type LMPartialState = Result<LMData, f32>;
-type PreEval = (Vec<usize>, Vec<f32>, f32);
+type LMPartialState = Result<LMData, Float>;
+type PreEval = (Vec<usize>, Vec<Float>, Float);
 struct Obs<'a> {
     intrinsics: &'a Intrinsics,
     template: &'a DMatrix<u8>,
     image: &'a DMatrix<u8>,
     coordinates: &'a Vec<(usize, usize)>,
-    _z_candidates: &'a Vec<f32>,
+    _z_candidates: &'a Vec<Float>,
     jacobians: &'a Vec<Vec6>,
     hessians: &'a Vec<Mat6>,
 }
 
-impl optim::State<Iso3, f32> for LMState {
+impl optim::State<Iso3, Float> for LMState {
     fn model(&self) -> &Iso3 {
         &self.data.model
     }
-    fn energy(&self) -> f32 {
+    fn energy(&self) -> Float {
         self.data.energy
     }
 }
 
-impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Iso3, PreEval, LMPartialState, f32> for LMOptimizer {
-    fn initial_energy() -> f32 {
+impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Iso3, PreEval, LMPartialState, Float> for LMOptimizer {
+    fn initial_energy() -> Float {
         f32::INFINITY
     }
 
@@ -286,21 +286,21 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Iso3, PreEval, LMPartialState, f32> f
         for (idx, &(x, y)) in obs.coordinates.iter().enumerate() {
             let _z = obs._z_candidates[idx];
             // check if warp(x,y) is inside the image
-            let (u, v) = warp(model, x as f32, y as f32, _z, &obs.intrinsics);
+            let (u, v) = warp(model, x as Float, y as Float, _z, &obs.intrinsics);
             if let Some(im) = interpolate(u, v, &obs.image) {
                 // precompute residuals and energy
                 let tmp = obs.template[(y, x)];
-                let r = im - tmp as f32;
+                let r = im - tmp as Float;
                 energy = energy + r * r;
                 residuals.push(r);
                 inside_indices.push(idx); // keep only inside points
             }
         }
-        energy = energy / residuals.len() as f32;
+        energy = energy / residuals.len() as Float;
         (inside_indices, residuals, energy)
     }
 
-    fn eval(obs: &Obs, energy: f32, pre_eval: PreEval, model: Iso3) -> LMPartialState {
+    fn eval(obs: &Obs, energy: Float, pre_eval: PreEval, model: Iso3) -> LMPartialState {
         let (inside_indices, residuals, new_energy) = pre_eval;
         if new_energy > energy {
             Err(new_energy)
@@ -371,12 +371,12 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Iso3, PreEval, LMPartialState, f32> f
 
 // Helper ######################################################################
 
-// fn angle(uq: UnitQuaternion<f32>) -> f32 {
+// fn angle(uq: UnitQuaternion<Float>) -> Float {
 //     let w = uq.into_inner().scalar();
 //     2.0 * uq.into_inner().vector().norm().atan2(w)
 // }
 
-fn re_normalize(uq: UnitQuaternion<f32>) -> UnitQuaternion<f32> {
+fn re_normalize(uq: UnitQuaternion<Float>) -> UnitQuaternion<Float> {
     let q = uq.into_inner();
     let sq_norm = q.norm_squared();
     UnitQuaternion::new_unchecked(0.5 * (3.0 - sq_norm) * q)
@@ -409,7 +409,7 @@ fn grad_squared_norm(grad_x: &DMatrix<i16>, grad_y: &DMatrix<i16>) -> DMatrix<u1
     })
 }
 
-fn extract_z(idepth_mat: &DMatrix<InverseDepth>) -> (Vec<(usize, usize)>, Vec<f32>) {
+fn extract_z(idepth_mat: &DMatrix<InverseDepth>) -> (Vec<(usize, usize)>, Vec<Float>) {
     let mut u = 0;
     let mut v = 0;
     let mut coordinates = Vec::new();
@@ -432,7 +432,7 @@ fn extract_z(idepth_mat: &DMatrix<InverseDepth>) -> (Vec<(usize, usize)>, Vec<f3
 fn warp_jacobians(
     intrinsics: &Intrinsics,
     coordinates: &Vec<(usize, usize)>,
-    _z_candidates: &Vec<f32>,
+    _z_candidates: &Vec<Float>,
     grad_x: &DMatrix<i16>,
     grad_y: &DMatrix<i16>,
 ) -> Vec<Vec6> {
@@ -448,24 +448,24 @@ fn warp_jacobians(
         .iter()
         .zip(_z_candidates.iter())
         .map(|(&(u, v), &_z)| {
-            let gu = grad_x[(v, u)] as f32;
-            let gv = grad_y[(v, u)] as f32;
-            warp_jacobian_at(gu, gv, u as f32, v as f32, _z, cu, cv, fu, fv, s)
+            let gu = grad_x[(v, u)] as Float;
+            let gv = grad_y[(v, u)] as Float;
+            warp_jacobian_at(gu, gv, u as Float, v as Float, _z, cu, cv, fu, fv, s)
         })
         .collect()
 }
 
 fn warp_jacobian_at(
-    gu: f32,
-    gv: f32,
-    u: f32,
-    v: f32,
-    _z: f32,
-    cu: f32,
-    cv: f32,
-    fu: f32,
-    fv: f32,
-    s: f32,
+    gu: Float,
+    gv: Float,
+    u: Float,
+    v: Float,
+    _z: Float,
+    cu: Float,
+    cv: Float,
+    fu: Float,
+    fv: Float,
+    s: Float,
 ) -> Vec6 {
     // Intermediate computations
     let a = u - cu;
@@ -491,26 +491,26 @@ fn hessians_vec(jacobians: &Vec<Vec6>) -> Vec<Mat6> {
     jacobians.iter().map(|j| j * j.transpose()).collect()
 }
 
-fn warp(model: &Iso3, x: f32, y: f32, _z: f32, intrinsics: &Intrinsics) -> (f32, f32) {
+fn warp(model: &Iso3, x: Float, y: Float, _z: Float, intrinsics: &Intrinsics) -> (Float, Float) {
     let x1 = intrinsics.back_project(Point2::new(x, y), 1.0 / _z);
     let x2 = model * x1;
     let uvz2 = intrinsics.project(x2);
     (uvz2.x / uvz2.z, uvz2.y / uvz2.z)
 }
 
-fn interpolate(x: f32, y: f32, image: &DMatrix<u8>) -> Option<f32> {
+fn interpolate(x: Float, y: Float, image: &DMatrix<u8>) -> Option<Float> {
     let (height, width) = image.shape();
     let u = x.floor();
     let v = y.floor();
-    if u >= 0.0 && u < (width - 2) as f32 && v >= 0.0 && v < (height - 2) as f32 {
+    if u >= 0.0 && u < (width - 2) as Float && v >= 0.0 && v < (height - 2) as Float {
         let u_0 = u as usize;
         let v_0 = v as usize;
         let u_1 = u_0 + 1;
         let v_1 = v_0 + 1;
-        let vu_00 = image[(v_0, u_0)] as f32;
-        let vu_10 = image[(v_1, u_0)] as f32;
-        let vu_01 = image[(v_0, u_1)] as f32;
-        let vu_11 = image[(v_1, u_1)] as f32;
+        let vu_00 = image[(v_0, u_0)] as Float;
+        let vu_10 = image[(v_1, u_0)] as Float;
+        let vu_01 = image[(v_0, u_1)] as Float;
+        let vu_11 = image[(v_1, u_1)] as Float;
         let a = x - u;
         let b = y - v;
         Some(

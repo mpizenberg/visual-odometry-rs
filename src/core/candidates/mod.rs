@@ -1,5 +1,7 @@
 use nalgebra::{DMatrix, Scalar};
 
+pub mod dso;
+
 pub type Float = f32;
 
 // Select a subset of points satisfying two conditions:

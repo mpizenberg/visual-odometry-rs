@@ -1,12 +1,8 @@
-extern crate image;
-extern crate nalgebra;
-
 use image::RgbImage;
 use nalgebra::DMatrix;
 
-use crate::colormap;
-use crate::interop;
-use crate::inverse_depth::{self, InverseDepth};
+use crate::core::inverse_depth::{self, InverseDepth};
+use crate::misc::{colormap, interop};
 
 pub type Float = f32;
 

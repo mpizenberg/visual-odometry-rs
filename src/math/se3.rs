@@ -4,7 +4,7 @@
 //     * details: http://ethaneade.com/lie.pdf
 //     * summary: http://ethaneade.com/lie_groups.pdf
 
-use crate::so3;
+use crate::math::so3;
 use nalgebra::{
     Isometry3, Matrix3, Matrix4, Quaternion, Translation3, UnitQuaternion, Vector3, Vector6,
 };
@@ -188,7 +188,7 @@ mod tests {
     // GENERATORS ####################################################
 
     fn gen_rigid_motion(translation_slice: &[Float; 3], angles: &[Float; 3]) -> Isometry3<Float> {
-        let translation = Translation3::from_vector(Vector3::from_column_slice(translation_slice));
+        let translation = Translation3::from(Vector3::from_column_slice(translation_slice));
         let rotation = UnitQuaternion::from_euler_angles(angles[0], angles[1], angles[2]);
         Isometry3::from_parts(translation, rotation)
     }

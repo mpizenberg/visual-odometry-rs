@@ -8,13 +8,12 @@ use nalgebra::{Matrix3, Quaternion, UnitQuaternion, Vector3};
 use std::f32::consts::PI;
 
 pub type Float = f32;
+pub type Element = Vector3<Float>;
 
 const EPSILON_TAYLOR_SERIES: Float = 1e-2;
 const EPSILON_TAYLOR_SERIES_2: Float = EPSILON_TAYLOR_SERIES * EPSILON_TAYLOR_SERIES;
 const _1_8: Float = 0.125;
 const _1_48: Float = 1.0 / 48.0;
-
-pub type Element = Vector3<Float>;
 
 // Hat operator.
 // Goes from so3 parameterization to so3 element (skew-symmetric matrix).

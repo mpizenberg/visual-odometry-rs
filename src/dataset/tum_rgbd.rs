@@ -1,12 +1,26 @@
-extern crate nalgebra as na;
-extern crate nom;
-
+use nalgebra as na;
 use std::path::PathBuf;
+
+use crate::core::camera::Intrinsics;
+
+pub type Float = f32;
+
+/// U16 depth values are scaled for better precision.
+/// So 5000 in the 16 bits gray png corresponds to 1 meter.
+pub const DEPTH_SCALE: Float = 5000.0;
+
+/// Intrinsics parameters of the ICL-NUIM dataset.
+pub const INTRINSICS_ICL_NUIM: Intrinsics = Intrinsics {
+    principal_point: (319.5, 239.5),
+    focal_length: 1.0,
+    scaling: (481.20, -480.00),
+    skew: 0.0,
+};
 
 #[derive(Debug)]
 pub struct Frame {
     pub timestamp: f64,
-    pub pose: na::Isometry3<f32>,
+    pub pose: na::Isometry3<Float>,
 }
 
 #[derive(Debug)]
@@ -104,7 +118,7 @@ pub mod parse {
     );
 
     // Parse extrinsics camera parameters.
-    named!(pose<CompleteStr, na::Isometry3<f32> >,
+    named!(pose<CompleteStr, na::Isometry3<Float> >,
         do_parse!(
             t: translation >> space >>
             r: rotation >>
@@ -113,7 +127,7 @@ pub mod parse {
     );
 
     // Parse components of a translation.
-    named!(translation<CompleteStr, na::Translation3<f32> >,
+    named!(translation<CompleteStr, na::Translation3<Float> >,
         do_parse!(
             x: float >> space >>
             y: float >> space >>
@@ -123,7 +137,7 @@ pub mod parse {
     );
 
     // Parse components of a unit quaternion describing the rotation.
-    named!(rotation<CompleteStr, na::UnitQuaternion<f32> >,
+    named!(rotation<CompleteStr, na::UnitQuaternion<Float> >,
         do_parse!(
             qx: float >> space >>
             qy: float >> space >>

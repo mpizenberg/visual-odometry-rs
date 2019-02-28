@@ -1,10 +1,13 @@
-use crate::camera::Camera;
-use crate::helper;
-use crate::inverse_depth::InverseDepth;
+use crate::{
+    core::{camera::Camera, inverse_depth::InverseDepth},
+    misc::helper,
+};
 use nalgebra::{DMatrix, Point2, Scalar};
 use num_traits::{self, NumCast};
-use std::f32;
-use std::ops::{Add, Mul};
+use std::{
+    f32,
+    ops::{Add, Mul},
+};
 
 pub type Float = f32;
 
@@ -30,7 +33,7 @@ pub fn reprojection_error(
                 total_count += 1;
                 let (indices, coefs) = linear_interpolator(x, y);
                 let img_xy = interpolate_with(indices, coefs, rgb_2);
-                let img_orig = rgb_1[(row, col)] as f32;
+                let img_orig = rgb_1[(row, col)] as Float;
                 reprojection_error_accum += (img_xy - img_orig).abs();
             }
         }

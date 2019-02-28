@@ -1,5 +1,5 @@
-use crate::helper::div_rem;
-use crate::multires;
+use crate::core::multires;
+use crate::misc::helper::div_rem;
 use nalgebra::{DMatrix, Scalar};
 use num_traits::{self, cast::AsPrimitive, NumCast};
 use rand::Rng;

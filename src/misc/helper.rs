@@ -1,10 +1,7 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use nalgebra::{DMatrix, Scalar};
 use png::{self, HasParameters};
-use std;
-use std::fs::File;
-use std::io::Cursor;
-use std::path::Path;
+use std::{self, fs::File, io::Cursor, path::Path};
 
 pub fn read_png_16bits_bis<P: AsRef<Path>>(
     file_path: P,
