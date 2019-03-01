@@ -1,3 +1,8 @@
+//! # Visual Odometry in Rust (vors)
+//!
+//! `visual-odometry-rs` is a library providing implementation
+//! of visual odometry algorithms fully in Rust.
+
 pub mod core;
 pub mod dataset;
 pub mod math;
