@@ -24,7 +24,7 @@ const _1_120: Float = 1.0 / 120.0;
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct Twist {
     v: Vec3,
-    w: so3::Element,
+    w: Vec3,
 }
 
 impl Add for Twist {

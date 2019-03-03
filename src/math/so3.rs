@@ -1,30 +1,31 @@
-// Interesting reads
-// * Sophus c++ library: https://github.com/strasdat/Sophus
-// * Ethan Eade course on Lie Groups for 2D and 3D transformations:
-//     * details: http://ethaneade.com/lie.pdf
-//     * summary: http://ethaneade.com/lie_groups.pdf
+//! Lie algebra/group functions for 3D rotations.
+//!
+//! Interesting reads:
+//! - Sophus c++ library: https://github.com/strasdat/Sophus
+//! - Ethan Eade course on Lie Groups for 2D and 3D transformations:
+//!     - details: http://ethaneade.com/lie.pdf
+//!     - summary: http://ethaneade.com/lie_groups.pdf
 
-use nalgebra::{Matrix3, Quaternion, UnitQuaternion, Vector3};
+use nalgebra::{Quaternion, UnitQuaternion};
 use std::f32::consts::PI;
 
-use crate::misc::type_aliases::Float;
+use crate::misc::type_aliases::{Float, Mat3, Vec3};
 
-pub type Element = Vector3<Float>;
-
+/// Threshold for using Taylor series in computations.
 const EPSILON_TAYLOR_SERIES: Float = 1e-2;
 const EPSILON_TAYLOR_SERIES_2: Float = EPSILON_TAYLOR_SERIES * EPSILON_TAYLOR_SERIES;
 const _1_8: Float = 0.125;
 const _1_48: Float = 1.0 / 48.0;
 
-// Hat operator.
-// Goes from so3 parameterization to so3 element (skew-symmetric matrix).
-pub fn hat(w: Element) -> Matrix3<Float> {
-    Matrix3::new(0.0, -w.z, w.y, w.z, 0.0, -w.x, -w.y, w.x, 0.0)
+/// Hat operator.
+/// Goes from so3 parameterization to so3 element (skew-symmetric matrix).
+pub fn hat(w: Vec3) -> Mat3 {
+    Mat3::new(0.0, -w.z, w.y, w.z, 0.0, -w.x, -w.y, w.x, 0.0)
 }
 
 // Squared hat operator (hat_2(w) == hat(w) * hat(w)).
 // PS: result is a symmetric matrix.
-pub fn hat_2(w: Element) -> Matrix3<Float> {
+pub fn hat_2(w: Vec3) -> Mat3 {
     let w11 = w.x * w.x;
     let w12 = w.x * w.y;
     let w22 = w.y * w.y;
@@ -32,7 +33,7 @@ pub fn hat_2(w: Element) -> Matrix3<Float> {
     let w33 = w.z * w.z;
     let w13 = w.x * w.z;
     #[cfg_attr(rustfmt, rustfmt_skip)]
-    Matrix3::new(
+    Mat3::new(
         -w22 - w33,     w12,           w13,
          w12,          -w11 - w33,     w23,
          w13,           w23,          -w11 - w22,
@@ -41,13 +42,13 @@ pub fn hat_2(w: Element) -> Matrix3<Float> {
 
 // Vee operator. Inverse of hat operator.
 // Warning! does not check that the given matrix is skew-symmetric.
-pub fn vee(mat: Matrix3<Float>) -> Element {
-    Vector3::new(mat.m32, mat.m13, mat.m21)
+pub fn vee(mat: Mat3) -> Vec3 {
+    Vec3::new(mat.m32, mat.m13, mat.m21)
 }
 
 // Compute the exponential map from Lie algebra so3 to Lie group SO3.
 // Goes from so3 parameterization to SO3 element (rotation).
-pub fn exp(w: Element) -> UnitQuaternion<Float> {
+pub fn exp(w: Vec3) -> UnitQuaternion<Float> {
     let theta_2 = w.norm_squared();
     let real_factor;
     let imag_factor;
@@ -67,7 +68,7 @@ pub fn exp(w: Element) -> UnitQuaternion<Float> {
 
 // Compute the logarithm map from the Lie group SO3 to the Lie algebra so3.
 // Inverse of the exponential map.
-pub fn log(rotation: UnitQuaternion<Float>) -> Element {
+pub fn log(rotation: UnitQuaternion<Float>) -> Vec3 {
     let imag_vector = rotation.vector();
     let imag_norm_2 = imag_vector.norm_squared();
     let real_factor = rotation.scalar();
@@ -100,7 +101,7 @@ mod tests {
 
     #[test]
     fn exp_log_round_trip() {
-        let w = Vector3::zeros();
+        let w = Vec3::zeros();
         assert_eq!(w, log(exp(w)));
     }
 
@@ -108,12 +109,12 @@ mod tests {
 
     quickcheck! {
         fn hat_vee_roundtrip(x: Float, y: Float, z: Float) -> bool {
-            let element = Vector3::new(x,y,z);
+            let element = Vec3::new(x,y,z);
             element == vee(hat(element))
         }
 
         fn hat_2_ok(x: Float, y: Float, z: Float) -> bool {
-            let element = Vector3::new(x,y,z);
+            let element = Vec3::new(x,y,z);
             hat_2(element) == hat(element) * hat(element)
         }
 
