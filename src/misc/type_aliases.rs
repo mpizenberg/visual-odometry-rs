@@ -1,3 +1,5 @@
+//! Type aliases for common types used all over the code base.
+
 use nalgebra as na;
 
 pub type Float = f32;
