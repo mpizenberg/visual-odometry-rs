@@ -157,7 +157,6 @@ pub fn log(iso: Iso3) -> Twist {
 mod tests {
 
     use super::*;
-    use nalgebra::UnitQuaternion;
 
     // The best precision I get for round trips with quickcheck random inputs
     // with exact trigonometric computations ("else" branches) is around 1e-4.
