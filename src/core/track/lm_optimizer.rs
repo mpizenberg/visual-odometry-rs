@@ -55,7 +55,7 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Iso3, PreEval, LMPartialState, Float>
     }
 
     fn apply_step(delta: Vec6, model: &Iso3) -> Iso3 {
-        let delta_warp = se3::exp(se3::from_vector(delta));
+        let delta_warp = se3::exp(delta);
         let mut not_normalized = model * delta_warp.inverse();
         not_normalized.rotation = re_normalize(not_normalized.rotation);
         not_normalized
