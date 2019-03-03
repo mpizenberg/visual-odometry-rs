@@ -1,8 +1,11 @@
+//! Miscellaneous helper functions that didn't fit elsewhere.
+
 use byteorder::{BigEndian, ReadBytesExt};
 use nalgebra::{DMatrix, Scalar};
 use png::{self, HasParameters};
 use std::{self, fs::File, io::Cursor, path::Path};
 
+/// Read a 16 bit gray png image from a file.
 pub fn read_png_16bits<P: AsRef<Path>>(
     file_path: P,
 ) -> Result<(usize, usize, Vec<u16>), png::DecodingError> {
@@ -28,6 +31,8 @@ pub fn read_png_16bits<P: AsRef<Path>>(
     Ok((info.width as usize, info.height as usize, buffer_u16))
 }
 
+/// Map a function onto a matrix, at positions given by a mask.
+/// A default value is used at the other positions.
 pub fn zip_mask_map<T, U, F>(mat: &DMatrix<T>, mask: &DMatrix<bool>, default: U, f: F) -> DMatrix<U>
 where
     T: Scalar,
@@ -37,7 +42,7 @@ where
     mat.zip_map(mask, |x, is_true| if is_true { f(x) } else { default })
 }
 
-// Compute the quotient and remainder both at the same time.
+/// Compute the quotient and remainder of x/y both at the same time.
 pub fn div_rem<T>(x: T, y: T) -> (T, T)
 where
     T: std::ops::Div<Output = T> + std::ops::Rem<Output = T> + Copy,
@@ -45,7 +50,7 @@ where
     (x / y, x % y)
 }
 
-// Check that a coordinate is in the bounds of an image of a given size.
+/// Check that a coordinate is in the bounds of an image of a given size.
 pub fn in_image_bounds(pos: (f32, f32), shape: (usize, usize)) -> bool {
     let x = pos.0;
     let y = pos.1;
