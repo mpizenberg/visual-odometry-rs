@@ -25,15 +25,18 @@ const _1_120: Float = 1.0 / 120.0;
 /// Parameterization of a twist (element of se3).
 pub type Twist = Vec6;
 
+/// Retrieve the linear velocity part of the twist parameterization.
 pub fn linear_velocity(xi: Twist) -> Vec3 {
     Vec3::new(xi[0], xi[1], xi[2])
 }
 
+/// Retrieve the angular velocity part of the twist parameterization.
 pub fn angular_velocity(xi: Twist) -> Vec3 {
     Vec3::new(xi[3], xi[4], xi[5])
 }
 
-// Hat operator. Goes from se3 parameters to se3 element (4x4 matrix).
+/// Hat operator.
+/// Goes from se3 parameters to se3 element (4x4 matrix).
 pub fn hat(xi: Twist) -> Mat4 {
     let w1 = xi[3];
     let w2 = xi[4];
@@ -47,14 +50,14 @@ pub fn hat(xi: Twist) -> Mat4 {
     )
 }
 
-// Vee operator. Inverse of hat operator.
-// Warning! does not check that the given top left 3x3 sub-matrix is skew-symmetric.
+/// Vee operator. Inverse of hat operator.
+/// Warning! does not check that the given top left 3x3 sub-matrix is skew-symmetric.
 pub fn vee(mat: Mat4) -> Twist {
     Vec6::new(mat.m14, mat.m24, mat.m34, mat.m32, mat.m13, mat.m21)
 }
 
-// Compute the exponential map from Lie algebra se3 to Lie group SE3.
-// Goes from se3 parameterization to SE3 element (rigid body motion).
+/// Compute the exponential map from Lie algebra se3 to Lie group SE3.
+/// Goes from se3 parameterization to SE3 element (rigid body motion).
 pub fn exp(xi: Twist) -> Iso3 {
     let xi_v = linear_velocity(xi);
     let xi_w = angular_velocity(xi);
@@ -87,8 +90,8 @@ pub fn exp(xi: Twist) -> Iso3 {
     }
 }
 
-// Compute the logarithm map from the Lie group SE3 to the Lie algebra se3.
-// Inverse of the exponential map.
+/// Compute the logarithm map from the Lie group SE3 to the Lie algebra se3.
+/// Inverse of the exponential map.
 pub fn log(iso: Iso3) -> Twist {
     let imag_vector = iso.rotation.vector();
     let imag_norm_2 = imag_vector.norm_squared();
