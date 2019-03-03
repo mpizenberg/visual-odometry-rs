@@ -1,3 +1,6 @@
+//! Colormap helpers for visualizations.
+
+/// Viridis colormap in an RGB u8 vector.
 pub fn viridis_u8() -> Vec<(u8, u8, u8)> {
     viridis()
         .into_iter()
@@ -9,6 +12,7 @@ fn to_u8(x: f32) -> u8 {
     (255.0 * x).round() as u8
 }
 
+/// Viridis colormap in an RGB f32 ([0-1]) vector.
 pub fn viridis() -> Vec<(f32, f32, f32)> {
     vec![
         (0.26700401, 0.00487433, 0.32941519),
