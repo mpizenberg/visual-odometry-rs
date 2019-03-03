@@ -74,10 +74,9 @@ pub fn hat(xi: Twist) -> Mat4 {
 // Vee operator. Inverse of hat operator.
 // Warning! does not check that the given top left 3x3 sub-matrix is skew-symmetric.
 pub fn vee(mat: Mat4) -> Twist {
-    // TODO: improve performance by using ::new(...)
     Twist {
-        w: Vec3::from_column_slice(&[mat[(2, 1)], mat[(0, 2)], mat[(1, 0)]]),
-        v: Vec3::from_column_slice(&[mat[(0, 3)], mat[(1, 3)], mat[(2, 3)]]),
+        v: Vec3::new(mat.m14, mat.m24, mat.m34),
+        w: Vec3::new(mat.m32, mat.m13, mat.m21),
     }
 }
 
