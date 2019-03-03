@@ -1,15 +1,10 @@
-use crate::{
-    core::{camera::Camera, inverse_depth::InverseDepth},
-    misc::helper,
-};
-use nalgebra::{DMatrix, Point2, Scalar};
+use nalgebra::{DMatrix, Scalar};
 use num_traits::{self, NumCast};
-use std::{
-    f32,
-    ops::{Add, Mul},
-};
+use std::ops::{Add, Mul};
 
-pub type Float = f32;
+use crate::core::{camera::Camera, inverse_depth::InverseDepth};
+use crate::misc::helper;
+use crate::misc::type_aliases::{Float, Point2};
 
 pub fn reprojection_error(
     idepth: &DMatrix<InverseDepth>,

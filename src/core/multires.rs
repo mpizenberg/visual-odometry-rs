@@ -1,7 +1,6 @@
-use crate::core::gradient;
 use nalgebra::{DMatrix, Scalar};
 
-pub type Float = f32;
+use crate::core::gradient;
 
 // Recursively generate a pyramid of matrices where each level
 // is half the previous resolution, computed with the mean of each 2x2 block.

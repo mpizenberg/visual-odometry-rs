@@ -1,14 +1,10 @@
-use nalgebra::{DMatrix, Isometry3, Matrix6, Point2, UnitQuaternion, Vector6};
+use nalgebra::{DMatrix, UnitQuaternion};
 use std::f32;
 
 use crate::core::camera::Intrinsics;
 use crate::math::optimizer::{self as optim, Optimizer, State};
 use crate::math::se3;
-
-pub type Float = f32;
-type Vec6 = Vector6<Float>;
-type Mat6 = Matrix6<Float>;
-type Iso3 = Isometry3<Float>;
+use crate::misc::type_aliases::{Float, Iso3, Mat6, Point2, Vec6};
 
 pub struct LMOptimizer;
 pub struct LMState {

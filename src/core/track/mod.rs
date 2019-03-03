@@ -1,6 +1,5 @@
 use itertools::izip;
-use nalgebra::{DMatrix, Isometry3, Matrix6, Point2, Vector6};
-use std::f32;
+use nalgebra::DMatrix;
 
 use crate::core::{
     camera::Intrinsics,
@@ -10,14 +9,11 @@ use crate::core::{
 };
 use crate::math::optimizer::Optimizer;
 use crate::misc::helper;
+use crate::misc::type_aliases::{Float, Iso3, Mat6, Point2, Vec6};
 
 pub mod lm_optimizer;
 
-pub type Float = f32;
-type Levels<T> = Vec<T>;
-type Vec6 = Vector6<Float>;
-type Mat6 = Matrix6<Float>;
-type Iso3 = Isometry3<Float>;
+pub type Levels<T> = Vec<T>;
 
 pub struct Tracker {
     config: Config,

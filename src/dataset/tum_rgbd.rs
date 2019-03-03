@@ -2,8 +2,7 @@ use nalgebra as na;
 use std::path::PathBuf;
 
 use crate::core::camera::Intrinsics;
-
-pub type Float = f32;
+use crate::misc::type_aliases::{Float, Iso3};
 
 /// U16 depth values are scaled for better precision.
 /// So 5000 in the 16 bits gray png corresponds to 1 meter.
@@ -20,7 +19,7 @@ pub const INTRINSICS_ICL_NUIM: Intrinsics = Intrinsics {
 #[derive(Debug)]
 pub struct Frame {
     pub timestamp: f64,
-    pub pose: na::Isometry3<Float>,
+    pub pose: Iso3,
 }
 
 #[derive(Debug)]
@@ -118,11 +117,11 @@ pub mod parse {
     );
 
     // Parse extrinsics camera parameters.
-    named!(pose<CompleteStr, na::Isometry3<Float> >,
+    named!(pose<CompleteStr, Iso3 >,
         do_parse!(
             t: translation >> space >>
             r: rotation >>
-            (na::Isometry3::from_parts(t, r))
+            (Iso3::from_parts(t, r))
         )
     );
 

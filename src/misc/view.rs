@@ -2,9 +2,8 @@ use image::RgbImage;
 use nalgebra::DMatrix;
 
 use crate::core::inverse_depth::{self, InverseDepth};
+use crate::misc::type_aliases::Float;
 use crate::misc::{colormap, interop};
-
-pub type Float = f32;
 
 // Create an RGB image containing the gray image
 // and Candidates points overimposed with a given color.

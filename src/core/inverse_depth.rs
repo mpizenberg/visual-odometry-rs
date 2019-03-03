@@ -1,6 +1,6 @@
 use rand;
 
-pub type Float = f32;
+use crate::misc::type_aliases::Float;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum InverseDepth {

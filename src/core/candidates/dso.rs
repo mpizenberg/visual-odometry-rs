@@ -1,9 +1,11 @@
-use crate::core::multires;
-use crate::misc::helper::div_rem;
 use nalgebra::{DMatrix, Scalar};
 use num_traits::{self, cast::AsPrimitive, NumCast};
 use rand::Rng;
 use std::ops::{Add, Div, Mul};
+
+use crate::core::multires;
+use crate::misc::helper::div_rem;
+use crate::misc::type_aliases::Float;
 
 pub trait Number<T>:
     Scalar
@@ -12,7 +14,7 @@ pub trait Number<T>:
     + Add<T, Output = T>
     + Div<T, Output = T>
     + Mul<T, Output = T>
-    + AsPrimitive<f32>
+    + AsPrimitive<Float>
     + std::fmt::Display
 {
 }
@@ -25,21 +27,21 @@ type Picked = u8;
 
 pub struct RegionConfig<T> {
     pub size: usize,
-    pub threshold_coefs: (f32, T),
+    pub threshold_coefs: (Float, T),
 }
 
 #[derive(Copy, Clone)]
 pub struct BlockConfig {
     pub base_size: usize,
     pub nb_levels: usize,
-    pub threshold_factor: f32,
+    pub threshold_factor: Float,
 }
 
 pub struct RecursiveConfig {
     pub nb_iterations_left: usize,
-    pub low_thresh: f32,
-    pub high_thresh: f32,
-    pub random_thresh: f32,
+    pub low_thresh: Float,
+    pub high_thresh: Float,
+    pub random_thresh: Float,
 }
 
 pub const DEFAULT_REGION_CONFIG: RegionConfig<u16> = RegionConfig {
@@ -82,14 +84,14 @@ pub fn select<T: Number<T>>(
     );
     let nb_candidates: usize = vec_nb_candidates.iter().sum();
     // println!("nb_candidates: {}", nb_candidates);
-    let candidates_ratio = nb_candidates as f32 / nb_target as f32;
+    let candidates_ratio = nb_candidates as Float / nb_target as Float;
     // The number of selected pixels behave approximately as
     // nb_candidates = K / (block_size + 1)^2 where K is scene dependant.
     // nb_target = K / (target_size + 1)^2
     // So sqrt( candidates_ratio ) = (target_size + 1) / (block_size + 1)
     // and in theory:
     // target_size = sqrt( ratio ) * (block_size + 1) - 1
-    let target_size = candidates_ratio.sqrt() * (block_config.base_size as f32 + 1.0) - 1.0;
+    let target_size = candidates_ratio.sqrt() * (block_config.base_size as Float + 1.0) - 1.0;
     let target_size = std::cmp::max(1, target_size.round() as i32) as usize;
     // println!("target_size: {}", target_size);
     if candidates_ratio < recursive_config.low_thresh {
@@ -218,7 +220,7 @@ fn max_of_four_gradients<T: Number<T>>(
 ///     * a mask of blocks to test for the next level,
 ///     * the updated picked candidates.
 fn pick_level_block_candidates<T: Number<T>>(
-    threshold_level_coef: f32,
+    threshold_level_coef: Float,
     level: Picked,
     regions_size: usize,
     regions_thresholds: &DMatrix<T>,
@@ -251,7 +253,7 @@ fn pick_level_block_candidates<T: Number<T>>(
 
 /// Smooth the medians and set thresholds given some coefficients (a,b):
 /// threshold = a * ( smooth( median ) + b ) ^ 2.
-fn region_thresholds<T: Number<T>>(median_gradients: &DMatrix<T>, coefs: (f32, T)) -> DMatrix<T> {
+fn region_thresholds<T: Number<T>>(median_gradients: &DMatrix<T>, coefs: (Float, T)) -> DMatrix<T> {
     let (nb_rows, nb_cols) = median_gradients.shape();
     DMatrix::from_fn(nb_rows, nb_cols, |i, j| {
         let start_i = std::cmp::max(0, i as i32 - 1) as usize;
@@ -267,7 +269,7 @@ fn region_thresholds<T: Number<T>>(median_gradients: &DMatrix<T>, coefs: (f32, T
             }
         }
         let (a, b) = coefs;
-        let thresh_tmp = sum.as_() / nb_elements as f32 + b.as_();
+        let thresh_tmp = sum.as_() / nb_elements as Float + b.as_();
         num_traits::cast(a * thresh_tmp * thresh_tmp).expect("woops")
     })
 }

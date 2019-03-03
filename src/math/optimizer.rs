@@ -7,13 +7,14 @@ pub enum Continue {
     Forward,
 }
 
-/// A `State` must provide access to its encapsulated model and energy.
+/// A `State<Model, E>` must provide access to its encapsulated model and energy.
 pub trait State<Model, E> {
     fn model(&self) -> &Model;
     fn energy(&self) -> E;
 }
 
-/// An `Optimizer` is capable of iteratively minimizing an energy function,
+/// An `Optimizer<Observations, S, Delta, Model, PreEval, PartialState, E>`
+/// is capable of iteratively minimizing an energy function,
 /// if provided few functions that are evaluated during iterations.
 ///
 /// It is merely a skeleton for any iterative optimizer,

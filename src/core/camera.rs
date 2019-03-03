@@ -1,6 +1,6 @@
-use nalgebra::{Affine2, Isometry3, Matrix3, Point2, Point3, Vector3};
+use nalgebra::Affine2;
 
-pub type Float = f32;
+use crate::misc::type_aliases::{Float, Iso3, Mat3, Point2, Point3, Vec3};
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Camera {
@@ -16,12 +16,12 @@ impl Camera {
         }
     }
 
-    pub fn project(&self, point: Point3<Float>) -> Vector3<Float> {
+    pub fn project(&self, point: Point3) -> Vec3 {
         self.intrinsics
             .project(extrinsics::project(&self.extrinsics, point))
     }
 
-    pub fn back_project(&self, point: Point2<Float>, depth: Float) -> Point3<Float> {
+    pub fn back_project(&self, point: Point2, depth: Float) -> Point3 {
         extrinsics::back_project(&self.extrinsics, self.intrinsics.back_project(point, depth))
     }
 
@@ -41,24 +41,24 @@ impl Camera {
 
 // EXTRINSICS ##############################################
 
-pub type Extrinsics = Isometry3<Float>;
+pub type Extrinsics = Iso3;
 
 pub mod extrinsics {
-    use super::{Extrinsics, Float};
-    use nalgebra::{Isometry3, Point3, Translation3, UnitQuaternion};
+    use super::*;
+    use nalgebra::{Translation3, UnitQuaternion};
 
     pub fn from_parts(
         translation: Translation3<Float>,
         rotation: UnitQuaternion<Float>,
     ) -> Extrinsics {
-        Isometry3::from_parts(translation, rotation)
+        Iso3::from_parts(translation, rotation)
     }
 
-    pub fn project(motion: &Extrinsics, point: Point3<Float>) -> Point3<Float> {
+    pub fn project(motion: &Extrinsics, point: Point3) -> Point3 {
         motion.rotation.inverse() * (motion.translation.inverse() * point)
     }
 
-    pub fn back_project(motion: &Extrinsics, point: Point3<Float>) -> Point3<Float> {
+    pub fn back_project(motion: &Extrinsics, point: Point3) -> Point3 {
         motion * point
     }
 }
@@ -76,7 +76,7 @@ pub struct Intrinsics {
 impl Intrinsics {
     pub fn matrix(&self) -> Affine2<Float> {
         #[cfg_attr(rustfmt, rustfmt_skip)]
-        Affine2::from_matrix_unchecked(Matrix3::new(
+        Affine2::from_matrix_unchecked(Mat3::new(
             self.focal_length * self.scaling.0, self.skew, self.principal_point.0,
             0.0, self.focal_length * self.scaling.1,       self.principal_point.1,
             0.0, 0.0, 1.0,
@@ -106,8 +106,8 @@ impl Intrinsics {
         }
     }
 
-    pub fn project(&self, point: Point3<Float>) -> Vector3<Float> {
-        Vector3::new(
+    pub fn project(&self, point: Point3) -> Vec3 {
+        Vec3::new(
             self.focal_length * self.scaling.0 * point[0]
                 + self.skew * point[1]
                 + self.principal_point.0 * point[2],
@@ -116,7 +116,7 @@ impl Intrinsics {
         )
     }
 
-    pub fn back_project(&self, point: Point2<Float>, depth: Float) -> Point3<Float> {
+    pub fn back_project(&self, point: Point2, depth: Float) -> Point3 {
         let z = depth;
         let y = (point[1] - self.principal_point.1) * z / (self.focal_length * self.scaling.1);
         let x = ((point[0] - self.principal_point.0) * z - self.skew * y)

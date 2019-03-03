@@ -2,8 +2,6 @@ use nalgebra::{DMatrix, Scalar};
 
 pub mod dso;
 
-pub type Float = f32;
-
 // Select a subset of points satisfying two conditions:
 //   * points shall be well-distributed in the image.
 //   * higher density where gradients are bigger.

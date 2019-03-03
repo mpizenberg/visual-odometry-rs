@@ -7,7 +7,8 @@
 use nalgebra::{Matrix3, Quaternion, UnitQuaternion, Vector3};
 use std::f32::consts::PI;
 
-pub type Float = f32;
+use crate::misc::type_aliases::Float;
+
 pub type Element = Vector3<Float>;
 
 const EPSILON_TAYLOR_SERIES: Float = 1e-2;
