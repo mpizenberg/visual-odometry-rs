@@ -45,14 +45,14 @@ pub fn hat_2(w: Vec3) -> Mat3 {
     )
 }
 
-// Vee operator. Inverse of hat operator.
-// Warning! does not check that the given matrix is skew-symmetric.
+/// Vee operator. Inverse of hat operator.
+/// Warning! does not check that the given matrix is skew-symmetric.
 pub fn vee(mat: Mat3) -> Vec3 {
     Vec3::new(mat.m32, mat.m13, mat.m21)
 }
 
-// Compute the exponential map from Lie algebra so3 to Lie group SO3.
-// Goes from so3 parameterization to SO3 element (rotation).
+/// Compute the exponential map from Lie algebra so3 to Lie group SO3.
+/// Goes from so3 parameterization to SO3 element (rotation).
 pub fn exp(w: Vec3) -> UnitQuaternion<Float> {
     let theta_2 = w.norm_squared();
     let real_factor;
@@ -66,13 +66,13 @@ pub fn exp(w: Vec3) -> UnitQuaternion<Float> {
         real_factor = half_theta.cos();
         imag_factor = half_theta.sin() / theta;
     }
-    // This is actually already a unit quaternion so we should not use
+    // TODO: This is actually already a unit quaternion so we should not use
     // the from_quaternion function that performs a renormalization.
     UnitQuaternion::from_quaternion(Quaternion::from_parts(real_factor, imag_factor * w))
 }
 
-// Compute the logarithm map from the Lie group SO3 to the Lie algebra so3.
-// Inverse of the exponential map.
+/// Compute the logarithm map from the Lie group SO3 to the Lie algebra so3.
+/// Inverse of the exponential map.
 pub fn log(rotation: UnitQuaternion<Float>) -> Vec3 {
     let imag_vector = rotation.vector();
     let imag_norm_2 = imag_vector.norm_squared();
