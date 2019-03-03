@@ -1,6 +1,13 @@
+//! Interoperability conversions between the image and matrix types.
+
 use image::{GrayImage, ImageBuffer, Luma, Rgb, RgbImage};
 use nalgebra::DMatrix;
 
+/// Convert an `u8` matrix into a `GrayImage`.
+/// Inverse operation of `matrix_from_image`.
+///
+/// Performs a transposition to accomodate for the
+/// column major matrix into the row major image.
 pub fn image_from_matrix(mat: &DMatrix<u8>) -> GrayImage {
     let (nb_rows, nb_cols) = mat.shape();
     let mut img_buf = GrayImage::new(nb_cols as u32, nb_rows as u32);
@@ -10,6 +17,10 @@ pub fn image_from_matrix(mat: &DMatrix<u8>) -> GrayImage {
     img_buf
 }
 
+/// Convert an `(u8,u8,8)` matrix into an `RgbImage`.
+///
+/// Performs a transposition to accomodate for the
+/// column major matrix into the row major image.
 pub fn rgb_from_matrix(mat: &DMatrix<(u8, u8, u8)>) -> RgbImage {
     let (nb_rows, nb_cols) = mat.shape();
     let mut img_buf = RgbImage::new(nb_cols as u32, nb_rows as u32);
@@ -20,15 +31,18 @@ pub fn rgb_from_matrix(mat: &DMatrix<(u8, u8, u8)>) -> RgbImage {
     img_buf
 }
 
-// Use a borrowed reference to the matrix buffer.
-// Due to a difference of row major instead of column major,
-// this produces a mirrored + rotated image (transposed image).
+/// Create a gray image with a borrowed reference to the matrix buffer.
+///
+/// Very performant since no copy is performed,
+/// but produces a transposed image due to differences in row/column major.
 pub fn image_from_matrix_transposed(mat: &DMatrix<u8>) -> ImageBuffer<Luma<u8>, &[u8]> {
     let (nb_rows, nb_cols) = mat.shape();
     ImageBuffer::from_raw(nb_rows as u32, nb_cols as u32, mat.as_slice())
         .expect("Buffer not large enough")
 }
 
+/// Convert a `GrayImage` into an `u8` matrix.
+/// Inverse operation of `image_from_matrix`.
 pub fn matrix_from_image(img: GrayImage) -> DMatrix<u8> {
     let (width, height) = img.dimensions();
     DMatrix::from_row_slice(height as usize, width as usize, &img.into_raw())
