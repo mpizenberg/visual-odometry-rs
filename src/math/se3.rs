@@ -1,8 +1,10 @@
-// Interesting reads
-// * Sophus c++ library: https://github.com/strasdat/Sophus
-// * Ethan Eade course on Lie Groups for 2D and 3D transformations:
-//     * details: http://ethaneade.com/lie.pdf
-//     * summary: http://ethaneade.com/lie_groups.pdf
+//! Lie algebra/group functions for 3D rigid body motion.
+//!
+//! Interesting reads:
+//! - Sophus c++ library: https://github.com/strasdat/Sophus
+//! - Ethan Eade course on Lie Groups for 2D and 3D transformations:
+//!     - details: http://ethaneade.com/lie.pdf
+//!     - summary: http://ethaneade.com/lie_groups.pdf
 
 use nalgebra::{Quaternion, Translation3, UnitQuaternion};
 use std::f32::consts::PI;
@@ -21,6 +23,8 @@ const _1_24: Float = 1.0 / 24.0;
 const _1_48: Float = 1.0 / 48.0;
 const _1_120: Float = 1.0 / 120.0;
 
+// TODO: change to Vec6.
+/// Parameterization of a twist (element of se3).
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct Twist {
     v: Vec3,
@@ -58,15 +62,19 @@ pub fn hat(xi: Twist) -> Mat4 {
     let v1 = xi.v[0];
     let v2 = xi.v[1];
     let v3 = xi.v[2];
-    Mat4::from_column_slice(&[
-        0.0, w3, -w2, 0.0, -w3, 0.0, w1, 0.0, w2, -w1, 0.0, 0.0, v1, v2, v3, 0.0,
-    ])
+    #[cfg_attr(rustfmt, rustfmt_skip)]
+    Mat4::new(
+         0.0,  -w3,    w2,   v1,
+         w3,    0.0,  -w1,   v2,
+        -w2,    w1,    0.0,  v3,
+         0.0,   0.0,   0.0,  0.0,
+    )
 }
 
 // Vee operator. Inverse of hat operator.
 // Warning! does not check that the given top left 3x3 sub-matrix is skew-symmetric.
 pub fn vee(mat: Mat4) -> Twist {
-    // TODO: improve performance.
+    // TODO: improve performance by using ::new(...)
     Twist {
         w: Vec3::from_column_slice(&[mat[(2, 1)], mat[(0, 2)], mat[(1, 0)]]),
         v: Vec3::from_column_slice(&[mat[(0, 3)], mat[(1, 3)], mat[(2, 3)]]),
