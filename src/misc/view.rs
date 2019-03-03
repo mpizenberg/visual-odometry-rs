@@ -1,3 +1,5 @@
+//! Helper functions to visualize images.
+
 use image::RgbImage;
 use nalgebra::DMatrix;
 
@@ -5,8 +7,8 @@ use crate::core::inverse_depth::{self, InverseDepth};
 use crate::misc::type_aliases::Float;
 use crate::misc::{colormap, interop};
 
-// Create an RGB image containing the gray image
-// and Candidates points overimposed with a given color.
+/// Creates an RGB image containing the gray image
+/// and candidates points overimposed in red.
 pub fn candidates_on_image(img: &DMatrix<u8>, candidates: &DMatrix<bool>) -> RgbImage {
     let rgb_mat = img.zip_map(candidates, |i, a| fuse_img_with_color(i, (255, 0, 0), a));
     interop::rgb_from_matrix(&rgb_mat)
@@ -20,7 +22,8 @@ fn fuse_img_with_color(intensity: u8, color: (u8, u8, u8), apply: bool) -> (u8, 
     }
 }
 
-// Create an RGB image of an inverse depth map.
+/// Create an RGB image of an inverse depth map.
+/// Uses `idepth_enum_colormap` for the color choices.
 pub fn idepth_image(idepth_map: &DMatrix<InverseDepth>) -> RgbImage {
     let viridis = &colormap::viridis_u8()[0..256];
     let (d_min, d_max) = min_max(idepth_map).unwrap();
@@ -29,6 +32,7 @@ pub fn idepth_image(idepth_map: &DMatrix<InverseDepth>) -> RgbImage {
     )
 }
 
+/// Find the minimum and maximum values in an inverse depth matrix.
 fn min_max(idepth_map: &DMatrix<InverseDepth>) -> Option<(Float, Float)> {
     let mut min_temp: Option<Float> = None;
     let mut max_temp: Option<Float> = None;
@@ -47,10 +51,10 @@ fn min_max(idepth_map: &DMatrix<InverseDepth>) -> Option<(Float, Float)> {
 
 // INVERSE DEPTH HELPERS #############################################
 
-// Visualize the enum as an 8-bits intensity:
-// Unknown:      black
-// Discarded:    gray
-// WithVariance: white
+/// Visualize the enum as an 8-bits intensity:
+/// - Unknown:      black
+/// - Discarded:    gray
+/// - WithVariance: white
 pub fn idepth_enum(idepth: &InverseDepth) -> u8 {
     match idepth {
         InverseDepth::Unknown => 0u8,
@@ -59,7 +63,10 @@ pub fn idepth_enum(idepth: &InverseDepth) -> u8 {
     }
 }
 
-// Use viridis colormap + red for Discarded
+/// Visualize the enum with color depending on inverse depth:
+/// - Unknown:      black
+/// - Discarded:    red
+/// - WithVariance: viridis colormap
 pub fn idepth_enum_colormap(
     colormap: &[(u8, u8, u8)],
     d_min: Float,
