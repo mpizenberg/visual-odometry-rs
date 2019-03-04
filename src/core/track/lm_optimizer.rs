@@ -205,6 +205,7 @@ fn re_normalize(uq: UnitQuaternion<Float>) -> UnitQuaternion<Float> {
 
 /// Warp a point from an image to another by a given rigid body motion.
 fn warp(model: &Iso3, x: Float, y: Float, _z: Float, intrinsics: &Intrinsics) -> (Float, Float) {
+    // TODO: maybe move into the camera module?
     let x1 = intrinsics.back_project(Point2::new(x, y), 1.0 / _z);
     let x2 = model * x1;
     let uvz2 = intrinsics.project(x2);

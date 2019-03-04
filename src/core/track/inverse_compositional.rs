@@ -1,3 +1,9 @@
+//! Types and functions to implement an inverse compositional tracking algorithm.
+//!
+//! Implementation of "Lucas-kanade 20 years on: A unifying framework"
+//! in the inverse compositional case.
+//! The warping function is parameterized by the Lie Algebra of twists se(3).
+
 use itertools::izip;
 use nalgebra::DMatrix;
 
@@ -12,22 +18,33 @@ use crate::math::optimizer::Optimizer;
 use crate::misc::helper;
 use crate::misc::type_aliases::{Float, Iso3, Mat6, Point2, Vec6};
 
+/// Type alias to easily spot vectors that are indexed over multi-resolution levels.
 pub type Levels<T> = Vec<T>;
 
+/// Struct used for tracking the camera at each frame.
+/// Can only be constructed by initialization from a `Config`.
 pub struct Tracker {
     config: Config,
     state: State,
 }
 
+/// Configuration of the Tracker.
 pub struct Config {
+    /// Number of levels in the multi-resolution pyramids of images.
     pub nb_levels: usize,
+    /// Threshold for the candidates selection algorithm.
     pub candidates_diff_threshold: u16,
+    /// Scale of the depth 16 bit images.
+    /// This is 5000.0 for the TUM RGB-D dataset.
     pub depth_scale: Float,
+    /// Camera intrinsic parameters.
     pub intrinsics: Intrinsics,
+    /// Default variance of the inverse depth values coming from the depth map.
     pub idepth_variance: Float,
 }
 
-pub struct State {
+/// Internal state of the tracker.
+struct State {
     keyframe_multires_data: MultiresData,
     keyframe_depth_timestamp: f64,
     keyframe_img_timestamp: f64,
@@ -37,6 +54,7 @@ pub struct State {
     current_frame_pose: Iso3,
 }
 
+/// Mostly multi-resolution data related to the frame.
 struct MultiresData {
     intrinsics_multires: Levels<Intrinsics>,
     img_multires: Levels<DMatrix<u8>>,
@@ -46,6 +64,7 @@ struct MultiresData {
 }
 
 impl Config {
+    /// Initialize a tracker with the first RGB-D frame.
     pub fn init(
         self,
         keyframe_depth_timestamp: f64,
@@ -75,6 +94,7 @@ impl Config {
     }
 } // impl Config
 
+/// Precompute the multi-resolution data of a frame.
 fn precompute_multires_data(
     config: &Config,
     depth_map: &DMatrix<u16>,
@@ -134,6 +154,10 @@ fn precompute_multires_data(
 }
 
 impl Tracker {
+    /// Track a new frame.
+    /// Internally mutates the tracker state.
+    ///
+    /// You can use `tracker.current_frame()` after tracking to retrieve the new frame pose.
     pub fn track(
         &mut self,
         depth_time: f64,
@@ -208,6 +232,7 @@ impl Tracker {
         }
     }
 
+    /// Retrieve the current frame pose and depth image timestamp.
     pub fn current_frame(&self) -> (f64, Iso3) {
         (
             self.state.current_frame_depth_timestamp,
@@ -223,7 +248,11 @@ impl Tracker {
 //     2.0 * uq.into_inner().vector().norm().atan2(w)
 // }
 
+/// Compute x and y centered gradients of an image.
+/// Border pixels gradients are set to 0.
 fn im_gradient(im: &DMatrix<u8>) -> (DMatrix<i16>, DMatrix<i16>) {
+    // TODO: move to the gradients module.
+    // TODO: might be better to return DMatrix<(i16,i16)>?
     let (nb_rows, nb_cols) = im.shape();
     let top = im.slice((0, 1), (nb_rows - 2, nb_cols - 2));
     let bottom = im.slice((2, 1), (nb_rows - 2, nb_cols - 2));
@@ -242,6 +271,7 @@ fn im_gradient(im: &DMatrix<u8>) -> (DMatrix<i16>, DMatrix<i16>) {
     (grad_x, grad_y)
 }
 
+/// Compute squared gradient norm from x and y gradient matrices.
 fn grad_squared_norm(grad_x: &DMatrix<i16>, grad_y: &DMatrix<i16>) -> DMatrix<u16> {
     grad_x.zip_map(grad_y, |gx, gy| {
         let gx = gx as i32;
@@ -250,9 +280,11 @@ fn grad_squared_norm(grad_x: &DMatrix<i16>, grad_y: &DMatrix<i16>) -> DMatrix<u1
     })
 }
 
+/// Extract known inverse depth values (and coordinates) into vectorized data.
 fn extract_z(idepth_mat: &DMatrix<InverseDepth>) -> (Vec<(usize, usize)>, Vec<Float>) {
     let mut u = 0;
     let mut v = 0;
+    // TODO: can allocating with a known max size improve performances?
     let mut coordinates = Vec::new();
     let mut _z_vec = Vec::new();
     let (nb_rows, _) = idepth_mat.shape();
@@ -270,6 +302,7 @@ fn extract_z(idepth_mat: &DMatrix<InverseDepth>) -> (Vec<(usize, usize)>, Vec<Fl
     (coordinates, _z_vec)
 }
 
+/// Precompute jacobians for each candidate.
 fn warp_jacobians(
     intrinsics: &Intrinsics,
     coordinates: &Vec<(usize, usize)>,
@@ -294,6 +327,7 @@ fn warp_jacobians(
         .collect()
 }
 
+/// Jacobian of the warping function for the inverse compositional algorithm.
 fn warp_jacobian_at(
     gu: Float,
     gv: Float,
@@ -326,11 +360,15 @@ fn warp_jacobian_at(
     jac
 }
 
+/// Compute hessians components for each candidate point.
 fn hessians_vec(jacobians: &Vec<Vec6>) -> Vec<Mat6> {
+    // TODO: might be better to inline this within the function computing the jacobians.
     jacobians.iter().map(|j| j * j.transpose()).collect()
 }
 
+/// Warp a point from an image to another by a given rigid body motion.
 fn warp(model: &Iso3, x: Float, y: Float, _z: Float, intrinsics: &Intrinsics) -> (Float, Float) {
+    // TODO: maybe move into the camera module?
     let x1 = intrinsics.back_project(Point2::new(x, y), 1.0 / _z);
     let x2 = model * x1;
     let uvz2 = intrinsics.project(x2);
