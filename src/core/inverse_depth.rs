@@ -23,10 +23,10 @@ pub enum InverseDepth {
 pub const DEFAULT_VARIANCE_ICL_NUIM: Float = 0.0001;
 
 // Transform depth value from dataset into an inverse depth value.
-pub fn from_depth(scale: Float, depth: u16) -> InverseDepth {
+pub fn from_depth(scale: Float, depth: u16, variance: Float) -> InverseDepth {
     match depth {
         0 => InverseDepth::Unknown,
-        _ => InverseDepth::WithVariance(scale / depth as Float, DEFAULT_VARIANCE),
+        _ => InverseDepth::WithVariance(scale / depth as Float, variance),
     }
 }
 

@@ -24,6 +24,7 @@ pub struct Config {
     pub candidates_diff_threshold: u16,
     pub depth_scale: Float,
     pub intrinsics: Intrinsics,
+    pub idepth_variance: Float,
 }
 
 pub struct State {
@@ -97,7 +98,7 @@ fn precompute_multires_data(
     .unwrap();
 
     // Only keep the "usable" points, i.e. those with a known depth information.
-    let from_depth = |z| inverse_depth::from_depth(config.depth_scale, z);
+    let from_depth = |z| inverse_depth::from_depth(config.depth_scale, z, config.idepth_variance);
     let idepth_candidates = helper::zip_mask_map(
         &depth_map,
         &candidates_points,

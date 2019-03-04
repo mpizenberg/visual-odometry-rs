@@ -10,6 +10,11 @@ use crate::misc::type_aliases::{Float, Iso3};
 /// So 5000 in the 16 bits gray png corresponds to 1 meter.
 pub const DEPTH_SCALE: Float = 5000.0;
 
+/// Acceptable error is assimilated to 1cm at 1m.
+/// The difference between 1/1m and 1/1.01m is ~ 0.01
+/// so we will take a variance of 0.01^2 = 0.0001.
+pub const VARIANCE_ICL_NUIM: Float = 0.0001;
+
 /// Intrinsics parameters of the ICL-NUIM dataset.
 pub const INTRINSICS_ICL_NUIM: Intrinsics = Intrinsics {
     principal_point: (319.5, 239.5),
