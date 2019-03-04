@@ -1,3 +1,6 @@
+//! Candidates point selection according to
+//! "Direct Sparse Odometry", J.Engel, V.Koltun, D. Cremers, PAMI 2018.
+
 use nalgebra::{DMatrix, Scalar};
 use num_traits::{self, cast::AsPrimitive, NumCast};
 use rand::Rng;
@@ -7,6 +10,7 @@ use crate::core::multires;
 use crate::misc::helper::div_rem;
 use crate::misc::type_aliases::Float;
 
+/// Trait for manipulating numbers types.
 pub trait Number<T>:
     Scalar
     + Ord
@@ -23,38 +27,57 @@ impl Number<u16> for u16 {}
 
 /// 0: not picked
 /// n: picked at level n
-type Picked = u8;
+pub type Picked = u8;
 
+/// Configuration of regions.
 pub struct RegionConfig<T> {
+    /// The region size.
     pub size: usize,
+    /// Some coefficients used for the region threshold computation.
     pub threshold_coefs: (Float, T),
 }
 
+/// Configuration of blocks.
 #[derive(Copy, Clone)]
 pub struct BlockConfig {
+    /// Base size of a block.
     pub base_size: usize,
+    /// Number of levels for picking points in blocks.
     pub nb_levels: usize,
+    /// Multiplier factor for block threshold computation.
     pub threshold_factor: Float,
 }
 
+/// Configuration of the recursive nature of candidates selection.
+/// If the number of points obtained after one iteration is not within
+/// given bounds, the algorithm adapts the base block size and re-iterates.
 pub struct RecursiveConfig {
+    /// Max number of iterations left.
     pub nb_iterations_left: usize,
+    /// Low percentage threshold of target number of points.
     pub low_thresh: Float,
+    /// High percentage threshold of target number of points.
     pub high_thresh: Float,
+    /// Threshold such that if we have random_thresh < points_ratio < high_thresh,
+    /// we randomly sample points to have approximatel the desired target number of candidate
+    /// points.
     pub random_thresh: Float,
 }
 
+/// Default region configuration according to DSO paper and code.
 pub const DEFAULT_REGION_CONFIG: RegionConfig<u16> = RegionConfig {
     size: 32,
     threshold_coefs: (1.0, 3), // (2.0, 3) in dso and (1.0, 3) in ldso
 };
 
+/// Default block configuration according to DSO paper and code.
 pub const DEFAULT_BLOCK_CONFIG: BlockConfig = BlockConfig {
     base_size: 4,
     nb_levels: 3,
     threshold_factor: 0.5,
 };
 
+/// Default recursive configuration according to DSO paper and code.
 pub const DEFAULT_RECURSIVE_CONFIG: RecursiveConfig = RecursiveConfig {
     nb_iterations_left: 1,
     low_thresh: 0.8,
@@ -62,9 +85,9 @@ pub const DEFAULT_RECURSIVE_CONFIG: RecursiveConfig = RecursiveConfig {
     random_thresh: 1.1,
 };
 
-// Select a subset of points satisfying two conditions:
-//   * points shall be well-distributed in the image.
-//   * higher density where gradients are bigger.
+/// Select a subset of points satisfying two conditions:
+///   * points shall be well-distributed in the image.
+///   * higher density where gradients are bigger.
 pub fn select<T: Number<T>>(
     gradients: &DMatrix<T>,
     region_config: RegionConfig<T>,
@@ -123,10 +146,12 @@ pub fn select<T: Number<T>>(
     }
 }
 
+/// Create a mask of picked points.
 fn to_mask(picked: DMatrix<u8>) -> DMatrix<bool> {
     picked.map(|p| p > 0)
 }
 
+/// Pick candidates at all the block levels.
 fn pick_all_block_candidates<T: Number<T>>(
     block_config: BlockConfig,
     regions_size: usize,
@@ -165,6 +190,7 @@ fn pick_all_block_candidates<T: Number<T>>(
     (nb_picked, candidates)
 }
 
+/// Retrieve the pixel with max gradient for each block in the image.
 fn init_max_gradients<T: Number<T>>(
     gradients: &DMatrix<T>,
     block_size: usize,
@@ -196,6 +222,7 @@ fn init_max_gradients<T: Number<T>>(
     })
 }
 
+/// Retrieve the max and position of 4 gradients.
 fn max_of_four_gradients<T: Number<T>>(
     g1: (T, usize, usize),
     g2: (T, usize, usize),
