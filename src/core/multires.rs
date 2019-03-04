@@ -1,9 +1,18 @@
+//! Helper functions for generation of multi-resolution data.
+
 use nalgebra::{DMatrix, Scalar};
 
 use crate::core::gradient;
 
-// Recursively generate a pyramid of matrices where each level
-// is half the previous resolution, computed with the mean of each 2x2 block.
+/// Recursively generate a pyramid of matrices where each following level
+/// is half the previous resolution, computed with the mean of each 2x2 block.
+///
+/// It consumes the original matrix to keep it as first level of the pyramid without copy.
+/// If you need it later, simply use something like `pyramid[0]`.
+///
+/// PS: since we are using 2x2 blocs,
+/// border information is lost for odd resolutions.
+/// Some precision is also left to keep the pyramid data as `u8`.
 pub fn mean_pyramid(max_levels: usize, mat: DMatrix<u8>) -> Vec<DMatrix<u8>> {
     limited_sequence(
         max_levels,
@@ -21,12 +30,16 @@ pub fn mean_pyramid(max_levels: usize, mat: DMatrix<u8>) -> Vec<DMatrix<u8>> {
     )
 }
 
-// Recursively apply a function transforming the image
-// until it's not possible anymore or the max number of iterations is reached.
-// Using iterations = 0 has the same effect than iterations = 1 since it always has
-// at least one matrix (the init matrix).
+/// Recursively apply a function transforming an image
+/// until it's not possible anymore or the max length is reached.
+///
+/// The sequence is initialized with the `init` function.
+/// Then `f` is applied to each successive result.
+///
+/// Using `max_length = 0` has the same effect than `max_length = 1` since
+/// the result vector contains always at least one matrix (the init matrix).
 pub fn limited_sequence<I, F, T, U>(
-    iterations: usize,
+    max_length: usize,
     mat: DMatrix<T>,
     init: I,
     f: F,
@@ -37,10 +50,10 @@ where
     T: Scalar,
     U: Scalar,
 {
-    let mut iteration = 1;
+    let mut length = 1;
     let f_limited = |x: &DMatrix<U>| {
-        if iteration < iterations {
-            iteration = iteration + 1;
+        if length < max_length {
+            length = length + 1;
             f(x)
         } else {
             None
@@ -49,8 +62,11 @@ where
     sequence(mat, init, f_limited)
 }
 
-// Recursively apply a function transforming the image
-// until it's not possible anymore.
+/// Recursively apply a function transforming an image
+/// until it's not possible anymore.
+///
+/// The sequence is initialized with the `init` function.
+/// Then `f` is applied to each successive result.
 pub fn sequence<I, F, T, U>(mat: DMatrix<T>, init: I, mut f: F) -> Vec<DMatrix<U>>
 where
     I: Fn(DMatrix<T>) -> DMatrix<U>,
@@ -58,17 +74,18 @@ where
     T: Scalar,
     U: Scalar,
 {
-    let mut pyr = Vec::new();
-    pyr.push(init(mat));
-    while let Some(new_mat) = f(pyr.last().unwrap()) {
-        pyr.push(new_mat);
+    let mut seq = Vec::new();
+    seq.push(init(mat));
+    while let Some(new_mat) = f(seq.last().unwrap()) {
+        seq.push(new_mat);
     }
-    pyr
+    seq
 }
 
-// Halve the resolution of a matrix by applying a function to each 2x2 block.
-// If one size of the matrix is < 2 then this function returns None.
-// If one size is odd, its last line/column is dropped.
+/// Halve the resolution of a matrix by applying a function to each 2x2 block.
+///
+/// If one size of the matrix is < 2 then this function returns None.
+/// If one size is odd, its last line/column is dropped.
 pub fn halve<F, T, U>(mat: &DMatrix<T>, f: F) -> Option<DMatrix<U>>
 where
     F: Fn(T, T, T, T) -> U,
@@ -94,30 +111,37 @@ where
 
 // Gradients stuff ###################################################
 
-// Compute centered gradients norm at each resolution from
-// the image at the higher resolution.
-// As a consequence their is one less level in the gradients pyramid.
+/// Compute centered gradients norm at each resolution from
+/// the image at the higher resolution.
+///
+/// As a consequence there is one less level in the gradients pyramid.
 pub fn gradients_squared_norm(multires_mat: &Vec<DMatrix<u8>>) -> Vec<DMatrix<u16>> {
     let nb_levels = multires_mat.len();
     multires_mat
         .iter()
         .take(nb_levels - 1)
-        .map(|mat| halve(mat, gradient::bloc_squared_norm).unwrap())
+        .map(|mat| {
+            halve(mat, gradient::bloc_squared_norm)
+                .expect("There is an issue in gradients_squared_norm")
+        })
         .collect()
 }
 
-// Compute centered gradients at each resolution from
-// the image at the higher resolution.
-// As a consequence their is one less level in the gradients pyramid.
+/// Compute centered gradients at each resolution from
+/// the image at the higher resolution.
+///
+/// As a consequence there is one less level in the gradients pyramid.
 pub fn gradients_xy(multires_mat: &Vec<DMatrix<u8>>) -> Vec<(DMatrix<i16>, DMatrix<i16>)> {
+    // TODO: maybe it would be better to return Vec<DMatrix<(i16,i16)>>,
+    // to colocate the x and y gradient and do only one "halve" call?
     let nb_levels = multires_mat.len();
     multires_mat
         .iter()
         .take(nb_levels - 1)
         .map(|mat| {
             (
-                halve(mat, gradient::bloc_x).unwrap(),
-                halve(mat, gradient::bloc_y).unwrap(),
+                halve(mat, gradient::bloc_x).expect("There is an issue in gradients_xy x."),
+                halve(mat, gradient::bloc_y).expect("There is an issue in gradients_xy y."),
             )
         })
         .collect()
