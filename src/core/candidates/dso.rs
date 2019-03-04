@@ -135,12 +135,10 @@ fn pick_all_block_candidates<T: Number<T>>(
 ) -> (Vec<usize>, DMatrix<Picked>) {
     let (nb_rows, nb_cols) = gradients.shape();
     let max_gradients_0 = init_max_gradients(gradients, block_config.base_size);
-    let max_gradients_multires = multires::limited_sequence(
-        block_config.nb_levels,
-        max_gradients_0,
-        |m| m,
-        |m| multires::halve(m, max_of_four_gradients),
-    );
+    let max_gradients_multires =
+        multires::limited_sequence(block_config.nb_levels, max_gradients_0, |m| {
+            multires::halve(m, max_of_four_gradients)
+        });
     let mut block_size = block_config.base_size;
     let mut threshold_level_coef = 1.0;
     let mut nb_picked = Vec::new();

@@ -106,12 +106,9 @@ fn precompute_multires_data(
         from_depth,
     );
     let fuse = |a, b, c, d| inverse_depth::fuse(a, b, c, d, inverse_depth::strategy_dso_mean);
-    let idepth_multires = multires::limited_sequence(
-        config.nb_levels,
-        idepth_candidates,
-        |m| m,
-        |m| multires::halve(&m, fuse),
-    );
+    let idepth_multires = multires::limited_sequence(config.nb_levels, idepth_candidates, |m| {
+        multires::halve(&m, fuse)
+    });
     let usable_candidates_multires: Levels<_> = idepth_multires.iter().map(extract_z).collect();
 
     // Precompute the Jacobians.
@@ -282,9 +279,7 @@ fn warp_jacobians(
 ) -> Vec<Vec6> {
     // Bind intrinsics to shorter names
     let (cu, cv) = intrinsics.principal_point;
-    let (su, sv) = intrinsics.scaling;
-    let fu = su * intrinsics.focal_length;
-    let fv = sv * intrinsics.focal_length;
+    let (fu, fv) = intrinsics.focal;
     let s = intrinsics.skew;
 
     // Iterate on inverse depth candidates

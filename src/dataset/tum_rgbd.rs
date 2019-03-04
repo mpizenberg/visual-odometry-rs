@@ -18,32 +18,28 @@ pub const VARIANCE_ICL_NUIM: Float = 0.0001;
 /// Intrinsics parameters of the ICL-NUIM dataset.
 pub const INTRINSICS_ICL_NUIM: Intrinsics = Intrinsics {
     principal_point: (319.5, 239.5),
-    focal_length: 1.0,
-    scaling: (481.20, -480.00),
+    focal: (481.20, -480.00),
     skew: 0.0,
 };
 
 /// Intrinsics parameters of freiburg 1 (fr1) scenes in the TUM RGB-D dataset.
 pub const INTRINSICS_FR1: Intrinsics = Intrinsics {
     principal_point: (318.643040, 255.313989),
-    focal_length: 1.0,
-    scaling: (517.306408, 516.469215),
+    focal: (517.306408, 516.469215),
     skew: 0.0,
 };
 
 /// Intrinsics parameters of freiburg 2 (fr2) scenes in the TUM RGB-D dataset.
 pub const INTRINSICS_FR2: Intrinsics = Intrinsics {
     principal_point: (325.141442, 249.701764),
-    focal_length: 1.0,
-    scaling: (520.908620, 521.007327),
+    focal: (520.908620, 521.007327),
     skew: 0.0,
 };
 
 /// Intrinsics parameters of freiburg 3 (fr3) scenes in the TUM RGB-D dataset.
 pub const INTRINSICS_FR3: Intrinsics = Intrinsics {
     principal_point: (320.106653, 247.632132),
-    focal_length: 1.0,
-    scaling: (535.433105, 539.212524),
+    focal: (535.433105, 539.212524),
     skew: 0.0,
 };
 

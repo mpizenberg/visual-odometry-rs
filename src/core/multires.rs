@@ -14,44 +14,25 @@ use crate::core::gradient;
 /// border information is lost for odd resolutions.
 /// Some precision is also left to keep the pyramid data as `u8`.
 pub fn mean_pyramid(max_levels: usize, mat: DMatrix<u8>) -> Vec<DMatrix<u8>> {
-    limited_sequence(
-        max_levels,
-        mat,
-        |m| m,
-        |m| {
-            halve(m, |a, b, c, d| {
-                let a = a as u16;
-                let b = b as u16;
-                let c = c as u16;
-                let d = d as u16;
-                ((a + b + c + d) / 4) as u8
-            })
-        },
-    )
+    limited_sequence(max_levels, mat, |m| {
+        halve(m, |a, b, c, d| {
+            let a = a as u16;
+            let b = b as u16;
+            let c = c as u16;
+            let d = d as u16;
+            ((a + b + c + d) / 4) as u8
+        })
+    })
 }
 
 /// Recursively apply a function transforming an image
 /// until it's not possible anymore or the max length is reached.
 ///
-/// The sequence is initialized with the `init` function.
-/// Then `f` is applied to each successive result.
-///
 /// Using `max_length = 0` has the same effect than `max_length = 1` since
 /// the result vector contains always at least one matrix (the init matrix).
-pub fn limited_sequence<I, F, T, U>(
-    max_length: usize,
-    mat: DMatrix<T>,
-    init: I,
-    f: F,
-) -> Vec<DMatrix<U>>
-where
-    I: Fn(DMatrix<T>) -> DMatrix<U>,
-    F: Fn(&DMatrix<U>) -> Option<DMatrix<U>>,
-    T: Scalar,
-    U: Scalar,
-{
+pub fn limited_sequence<F: Fn(&T) -> Option<T>, T>(max_length: usize, data: T, f: F) -> Vec<T> {
     let mut length = 1;
-    let f_limited = |x: &DMatrix<U>| {
+    let f_limited = |x: &T| {
         if length < max_length {
             length = length + 1;
             f(x)
@@ -59,27 +40,18 @@ where
             None
         }
     };
-    sequence(mat, init, f_limited)
+    sequence(data, f_limited)
 }
 
-/// Recursively apply a function transforming an image
+/// Recursively apply a function transforming data
 /// until it's not possible anymore.
-///
-/// The sequence is initialized with the `init` function.
-/// Then `f` is applied to each successive result.
-pub fn sequence<I, F, T, U>(mat: DMatrix<T>, init: I, mut f: F) -> Vec<DMatrix<U>>
-where
-    I: Fn(DMatrix<T>) -> DMatrix<U>,
-    F: FnMut(&DMatrix<U>) -> Option<DMatrix<U>>,
-    T: Scalar,
-    U: Scalar,
-{
-    let mut seq = Vec::new();
-    seq.push(init(mat));
-    while let Some(new_mat) = f(seq.last().unwrap()) {
-        seq.push(new_mat);
+pub fn sequence<F: FnMut(&T) -> Option<T>, T>(data: T, mut f: F) -> Vec<T> {
+    let mut s = Vec::new();
+    s.push(data);
+    while let Some(new_data) = f(s.last().unwrap()) {
+        s.push(new_data);
     }
-    seq
+    s
 }
 
 /// Halve the resolution of a matrix by applying a function to each 2x2 block.
