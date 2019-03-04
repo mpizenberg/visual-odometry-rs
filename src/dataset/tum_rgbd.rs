@@ -1,3 +1,5 @@
+//! Helper functions to handle datasets compatible with TUM RGB-D.
+
 use nalgebra as na;
 use std::path::PathBuf;
 
@@ -16,12 +18,38 @@ pub const INTRINSICS_ICL_NUIM: Intrinsics = Intrinsics {
     skew: 0.0,
 };
 
+/// Intrinsics parameters of freiburg 1 (fr1) scenes in the TUM RGB-D dataset.
+pub const INTRINSICS_FR1: Intrinsics = Intrinsics {
+    principal_point: (318.643040, 255.313989),
+    focal_length: 1.0,
+    scaling: (517.306408, 516.469215),
+    skew: 0.0,
+};
+
+/// Intrinsics parameters of freiburg 2 (fr2) scenes in the TUM RGB-D dataset.
+pub const INTRINSICS_FR2: Intrinsics = Intrinsics {
+    principal_point: (325.141442, 249.701764),
+    focal_length: 1.0,
+    scaling: (520.908620, 521.007327),
+    skew: 0.0,
+};
+
+/// Intrinsics parameters of freiburg 3 (fr3) scenes in the TUM RGB-D dataset.
+pub const INTRINSICS_FR3: Intrinsics = Intrinsics {
+    principal_point: (320.106653, 247.632132),
+    focal_length: 1.0,
+    scaling: (535.433105, 539.212524),
+    skew: 0.0,
+};
+
+/// Timestamp and 3D camera pose of a frame.
 #[derive(Debug)]
 pub struct Frame {
     pub timestamp: f64,
     pub pose: Iso3,
 }
 
+/// Association of two related depth and color timestamps and images file paths.
 #[derive(Debug)]
 pub struct Association {
     pub depth_timestamp: f64,
@@ -30,7 +58,9 @@ pub struct Association {
     pub color_file_path: PathBuf,
 }
 
+/// Write Frame data in the TUM RGB-D format for trajectories.
 impl std::string::ToString for Frame {
+    /// `timestamp tx ty tz qx qy qz qw`
     fn to_string(&self) -> String {
         let t = self.pose.translation.vector;
         let q = self.pose.rotation.into_inner().coords;
@@ -41,6 +71,7 @@ impl std::string::ToString for Frame {
     }
 }
 
+/// Parse useful files (trajectories, associations, ...) in a dataset using the TUM RGB-D format.
 pub mod parse {
     use super::*;
     use nom::{
@@ -48,12 +79,14 @@ pub mod parse {
         types::CompleteStr,
     };
 
+    /// Parse an association file into a vector of `Association`.
     pub fn associations(file_content: String) -> Result<Vec<Association>, String> {
         multi_line(association_line, file_content)
     }
 
-    pub fn groundtruth(file_content: String) -> Result<Vec<Frame>, String> {
-        multi_line(groundtruth_line, file_content)
+    /// Parse a trajectory file into a vector of `Frame`.
+    pub fn trajectory(file_content: String) -> Result<Vec<Frame>, String> {
+        multi_line(trajectory_line, file_content)
     }
 
     fn multi_line<F, T>(line_parser: F, file_content: String) -> Result<Vec<T>, String>
@@ -95,10 +128,10 @@ pub mod parse {
         map!(is_not!(" \t\r\n"), |s| PathBuf::from(*s))
     );
 
-    // Ground truth --------------------
+    // Trajectory ----------------------
 
-    // Ground truth line is either a comment or a frame timestamp and pose.
-    named!(groundtruth_line<CompleteStr, Option<Frame> >,
+    // Trajectory line is either a comment or a frame timestamp and pose.
+    named!(trajectory_line<CompleteStr, Option<Frame> >,
         alt!( map!(comment, |_| None) | map!(frame, |f| Some(f)) )
     );
 

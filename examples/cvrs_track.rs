@@ -89,6 +89,7 @@ fn check_args(args: Vec<String>) -> Result<Args, String> {
 }
 
 fn create_camera(camera_id: &str) -> Result<Intrinsics, String> {
+    // TODO: use camera definitions in dataset::tum_rgbd
     match camera_id {
         "fr1" => Ok(Intrinsics {
             principal_point: (318.643040, 255.313989),
