@@ -1,8 +1,13 @@
+//! Candidates points selection in a coarse to fine manner.
+
 use nalgebra::{DMatrix, Scalar};
 
-// Select a subset of points satisfying two conditions:
-//   * points shall be well-distributed in the image.
-//   * higher density where gradients are bigger.
+/// Select a subset of points satisfying two conditions:
+///   * points shall be well-distributed in the image.
+///   * higher density where gradients are bigger.
+///
+/// Each level is kept but important one
+/// is the one at the highest resolution (the last one).
 pub fn select<T>(diff_threshold: T, gradients: &Vec<DMatrix<T>>) -> Vec<DMatrix<bool>>
 where
     T: Scalar + std::cmp::PartialOrd + std::ops::Add<Output = T>,
@@ -22,8 +27,8 @@ where
         })
 }
 
-// Apply a predicate function on each 2x2 bloc.
-// Only evaluate the function in selected blocs in half res pre_mask.
+/// Apply a predicate function on each 2x2 bloc.
+/// Only evaluate the function in selected blocs in the half resolution pre_mask.
 fn select_2x2_bloc<T, F>(pre_mask: &DMatrix<bool>, mat: &DMatrix<T>, f: F) -> DMatrix<bool>
 where
     T: Scalar,
@@ -51,14 +56,14 @@ where
     mask
 }
 
-// Discard the 2 or 3 lowest values.
-// The second higher value is kept only if:
-//     second > third + thresh
-//
-// For example: with thresh = 5
-//     ( 0, 1, 8, 9 ) -> [ false, false, true, true ]
-//     ( 0, 9, 1, 8 ) -> [ false, true, false, true ]
-//     ( 1, 0, 9, 0 ) -> [ false, false, true, false ]
+/// Discard the 2 or 3 lowest values.
+/// The second higher value is kept only if:
+///     second > third + thresh
+///
+/// For example: with thresh = 5
+///     ( 0, 1, 8, 9 ) -> [ false, false, true, true ]
+///     ( 0, 9, 1, 8 ) -> [ false, true, false, true ]
+///     ( 1, 0, 9, 0 ) -> [ false, false, true, false ]
 fn prune_with_thresh<T>(thresh: T, a: T, b: T, c: T, d: T) -> [bool; 4]
 where
     T: Scalar + std::cmp::PartialOrd + std::ops::Add<Output = T>,
