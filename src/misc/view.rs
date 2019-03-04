@@ -3,7 +3,7 @@
 use image::RgbImage;
 use nalgebra::DMatrix;
 
-use crate::core::inverse_depth::{self, InverseDepth};
+use crate::core::inverse_depth::InverseDepth;
 use crate::misc::type_aliases::Float;
 use crate::misc::{colormap, interop};
 
@@ -37,9 +37,9 @@ fn min_max(idepth_map: &DMatrix<InverseDepth>) -> Option<(Float, Float)> {
     let mut min_temp: Option<Float> = None;
     let mut max_temp: Option<Float> = None;
     idepth_map.iter().for_each(|idepth| {
-        if let Some((d, _)) = inverse_depth::with_variance(idepth) {
-            min_temp = min_temp.map(|x| x.min(d)).or(Some(d));
-            max_temp = max_temp.map(|x| x.max(d)).or(Some(d));
+        if let &InverseDepth::WithVariance(id, _) = idepth {
+            min_temp = min_temp.map(|x| x.min(id)).or(Some(id));
+            max_temp = max_temp.map(|x| x.max(id)).or(Some(id));
         }
     });
     if let (Some(min_value), Some(max_value)) = (min_temp, max_temp) {
