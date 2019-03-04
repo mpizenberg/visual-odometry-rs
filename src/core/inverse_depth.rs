@@ -1,7 +1,15 @@
+//! Helper functions to manipulate inverse depth data from depth images.
+
 use rand;
 
 use crate::misc::type_aliases::Float;
 
+/// An inverse depth can be one of three values: unknown, discarded, or known with a given
+/// variance.
+///
+/// - `Unknown`: Not known by the capture device.
+/// - `Discarded`: Value was considered too unreliable and discarded.
+/// - `WithVariance(inverse_depth, variance)`: known but with a given uncertainty.
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum InverseDepth {
     Unknown,
@@ -12,7 +20,7 @@ pub enum InverseDepth {
 // Acceptable error is assimilated to 1cm at 1m.
 // The difference between 1/1m and 1/1.01m is ~ 0.01
 // So we will take a variance of 0.01^2 = 0.0001
-pub const DEFAULT_VARIANCE: Float = 0.0001;
+pub const DEFAULT_VARIANCE_ICL_NUIM: Float = 0.0001;
 
 // Transform depth value from dataset into an inverse depth value.
 pub fn from_depth(scale: Float, depth: u16) -> InverseDepth {
