@@ -82,7 +82,7 @@ impl std::string::ToString for Frame {
 pub mod parse {
     use super::*;
     use nom::{
-        alt, anychar, call, do_parse, double, float, is_not, many0, map, named, space, tag,
+        alt, anychar, do_parse, double, float, is_not, many0, map, named, space, tag,
         types::CompleteStr,
     };
 
