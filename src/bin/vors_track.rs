@@ -1,15 +1,14 @@
-extern crate computer_vision_rs as cv;
 extern crate image;
 extern crate nalgebra as na;
+extern crate visual_odometry_rs as vors;
 
 use na::DMatrix;
 use std::{env, error::Error, fs, io::BufReader, io::Read, path::PathBuf};
 
-use cv::camera::Intrinsics;
-use cv::helper;
-use cv::interop;
-use cv::track;
-use cv::tum_rgbd;
+use vors::core::camera::Intrinsics;
+use vors::core::track::inverse_compositional as track;
+use vors::dataset::tum_rgbd;
+use vors::misc::{helper, interop};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -18,7 +17,7 @@ fn main() {
     }
 }
 
-const USAGE: &str = "Usage: ./cvrs_track [fr1|fr2|fr3|icl] associations_file";
+const USAGE: &str = "Usage: ./vors_track [fr1|fr2|fr3|icl] associations_file";
 
 fn my_run(args: Vec<String>) -> Result<(), Box<Error>> {
     // Check that the arguments are correct.
@@ -31,8 +30,9 @@ fn my_run(args: Vec<String>) -> Result<(), Box<Error>> {
     let config = track::Config {
         nb_levels: 6,
         candidates_diff_threshold: 7,
-        depth_scale: 5000.0,
+        depth_scale: tum_rgbd::DEPTH_SCALE,
         intrinsics: valid_args.intrinsics,
+        idepth_variance: 0.0001,
     };
 
     // Initialize tracker with first depth and color image.
@@ -62,6 +62,7 @@ struct Args {
     intrinsics: Intrinsics,
 }
 
+/// Verify that command line arguments are correct.
 fn check_args(args: Vec<String>) -> Result<Args, String> {
     // eprintln!("{:?}", args);
     match args.as_slice() {
@@ -88,33 +89,13 @@ fn check_args(args: Vec<String>) -> Result<Args, String> {
     }
 }
 
+/// Create camera depending on camera_id command line argument.
 fn create_camera(camera_id: &str) -> Result<Intrinsics, String> {
-    // TODO: use camera definitions in dataset::tum_rgbd
     match camera_id {
-        "fr1" => Ok(Intrinsics {
-            principal_point: (318.643040, 255.313989),
-            focal_length: 1.0,
-            scaling: (517.306408, 516.469215),
-            skew: 0.0,
-        }),
-        "fr2" => Ok(Intrinsics {
-            principal_point: (325.141442, 249.701764),
-            focal_length: 1.0,
-            scaling: (520.908620, 521.007327),
-            skew: 0.0,
-        }),
-        "fr3" => Ok(Intrinsics {
-            principal_point: (320.106653, 247.632132),
-            focal_length: 1.0,
-            scaling: (535.433105, 539.212524),
-            skew: 0.0,
-        }),
-        "icl" => Ok(Intrinsics {
-            principal_point: (319.5, 239.5),
-            focal_length: 1.0,
-            scaling: (481.2, -480.0),
-            skew: 0.0,
-        }),
+        "fr1" => Ok(tum_rgbd::INTRINSICS_FR1),
+        "fr2" => Ok(tum_rgbd::INTRINSICS_FR2),
+        "fr3" => Ok(tum_rgbd::INTRINSICS_FR3),
+        "icl" => Ok(tum_rgbd::INTRINSICS_ICL_NUIM),
         _ => {
             eprintln!("{}", USAGE);
             Err(format!("Unknown camera id: {}", camera_id))
@@ -122,6 +103,7 @@ fn create_camera(camera_id: &str) -> Result<Intrinsics, String> {
     }
 }
 
+/// Open an association file and parse it into a vector of Association.
 fn parse_associations(file_path: PathBuf) -> Result<Vec<tum_rgbd::Association>, Box<Error>> {
     let file = fs::File::open(&file_path)?;
     let mut file_reader = BufReader::new(file);
@@ -132,6 +114,7 @@ fn parse_associations(file_path: PathBuf) -> Result<Vec<tum_rgbd::Association>, 
         .map_err(|s| s.into())
 }
 
+/// Transform relative images file paths into absolute ones.
 fn abs_path(file_path: &PathBuf, assoc: &tum_rgbd::Association) -> tum_rgbd::Association {
     let parent = file_path.parent().expect("How can this have no parent");
     tum_rgbd::Association {
@@ -142,6 +125,7 @@ fn abs_path(file_path: &PathBuf, assoc: &tum_rgbd::Association) -> tum_rgbd::Ass
     }
 }
 
+/// Read a depth and color image given by an association.
 fn read_images(assoc: &tum_rgbd::Association) -> Result<(DMatrix<u16>, DMatrix<u8>), Box<Error>> {
     let (w, h, depth_map_vec_u16) = helper::read_png_16bits(&assoc.depth_file_path)?;
     let depth_map = DMatrix::from_row_slice(h, w, depth_map_vec_u16.as_slice());
