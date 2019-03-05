@@ -46,16 +46,22 @@ pub const INTRINSICS_FR3: Intrinsics = Intrinsics {
 /// Timestamp and 3D camera pose of a frame.
 #[derive(Debug)]
 pub struct Frame {
+    /// Timestamp of the frame.
     pub timestamp: f64,
+    /// Pose (rigid body motion / direct isometry) of the frame.
     pub pose: Iso3,
 }
 
 /// Association of two related depth and color timestamps and images file paths.
 #[derive(Debug)]
 pub struct Association {
+    /// Timestamp of the depth image.
     pub depth_timestamp: f64,
+    /// File path of the depth image.
     pub depth_file_path: PathBuf,
+    /// Timestamp of the color image.
     pub color_timestamp: f64,
+    /// File path of the color image.
     pub color_file_path: PathBuf,
 }
 

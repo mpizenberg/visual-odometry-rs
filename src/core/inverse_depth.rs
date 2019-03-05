@@ -6,14 +6,13 @@ use crate::misc::type_aliases::Float;
 
 /// An inverse depth can be one of three values: unknown, discarded, or known with a given
 /// variance.
-///
-/// - `Unknown`: Not known by the capture device.
-/// - `Discarded`: Value was considered too unreliable and discarded.
-/// - `WithVariance(inverse_depth, variance)`: known but with a given uncertainty.
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum InverseDepth {
+    /// Not known by the capture device.
     Unknown,
+    /// Value was considered too unreliable and discarded.
     Discarded,
+    /// `WithVariance(inverse_depth, variance)`: known but with a given uncertainty.
     WithVariance(Float, Float),
 }
 

@@ -12,7 +12,9 @@ use crate::misc::type_aliases::{Float, Iso3, Mat3, Point2, Point3, Vec3};
 /// As it stands, it is currently limited to the pinhole camera model.
 #[derive(PartialEq, Debug, Clone)]
 pub struct Camera {
+    /// Intrinsic parameters of the camera.
     pub intrinsics: Intrinsics,
+    /// Extrinsic parameters of the camera pose.
     pub extrinsics: Extrinsics,
 }
 
@@ -76,8 +78,11 @@ pub mod extrinsics {
 /// Intrinsic parameters of a pinhole camera model.
 #[derive(PartialEq, Debug, Clone)]
 pub struct Intrinsics {
+    /// Principal point (in the optical center axis) of the camera.
     pub principal_point: (Float, Float),
+    /// Focal length in pixels along both axes.
     pub focal: (Float, Float),
+    /// Skew of the camera, usually 0.0.
     pub skew: Float,
 }
 

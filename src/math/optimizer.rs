@@ -3,13 +3,17 @@
 /// Enum used to indicate if iterations should continue or stop.
 /// Must be returned by the stop_criterion function.
 pub enum Continue {
+    /// Stop iterations.
     Stop,
+    /// Continue iterations.
     Forward,
 }
 
 /// A `State<Model, E>` must provide access to its encapsulated model and energy.
 pub trait State<Model, E> {
+    /// Retrieve the model in the state.
     fn model(&self) -> &Model;
+    /// Retrieve the energy in the state.
     fn energy(&self) -> E;
 }
 
