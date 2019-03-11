@@ -12,9 +12,9 @@ use crate::core::{
     candidates::coarse_to_fine as candidates,
     inverse_depth::{self, InverseDepth},
     multires,
-    track::lm_optimizer,
+    track::lm_optimizer::{self, LMOptimizerState},
 };
-use crate::math::optimizer::Optimizer;
+use crate::math::optimizer::OptimizerState;
 use crate::misc::helper;
 use crate::misc::type_aliases::{Float, Iso3, Mat6, Point2, Vec6};
 
@@ -179,14 +179,12 @@ impl Tracker {
                 jacobians: &keyframe_data.jacobians_multires[lvl],
                 hessians: &keyframe_data.hessians_multires[lvl],
             };
-            let data = lm_optimizer::LMOptimizer::init(&obs, lm_model).unwrap();
-            let lm_state = lm_optimizer::LMState { lm_coef: 0.1, data };
-            match lm_optimizer::LMOptimizer::iterative(&obs, lm_state) {
-                Some((lm_state, _)) => {
-                    lm_model = lm_state.data.model;
+            match LMOptimizerState::iterative_solve(&obs, lm_model) {
+                Ok((lm_state, _)) => {
+                    lm_model = lm_state.eval_data.model;
                 }
-                None => {
-                    eprintln!("Iterations did not converge!");
+                Err(err) => {
+                    eprintln!("{}", err);
                     optimization_went_well = false;
                     break;
                 }

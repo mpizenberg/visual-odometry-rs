@@ -2,26 +2,29 @@
 //! for the inverse compositional tracking algorithm.
 
 use nalgebra::{DMatrix, UnitQuaternion};
-use std::f32;
 
 use crate::core::camera::Intrinsics;
-use crate::math::optimizer::{self as optim, Optimizer, State};
+use crate::math::optimizer::{Continue, OptimizerState};
 use crate::math::se3;
 use crate::misc::type_aliases::{Float, Iso3, Mat6, Point2, Vec6};
 
-/// Empty struct, implementor of `Optimizer`.
-pub struct LMOptimizer;
-
 /// State of the Levenberg-Marquardt optimizer.
-pub struct LMState {
+pub struct LMOptimizerState {
     /// Levenberg-Marquardt hessian diagonal coefficient.
     pub lm_coef: Float,
     /// Data used during the optimizer iterations.
-    pub data: LMData,
+    pub eval_data: EvalData,
 }
 
+/// Either a fully constructed `LMData`
+/// or an error containing the energy of the new iteration.
+///
+/// The error is returned when the new computed energy
+/// is higher than the previous iteration energy.
+pub type EvalState = Result<EvalData, Float>;
+
 /// Data needed during the optimizer iterations.
-pub struct LMData {
+pub struct EvalData {
     /// The hessian matrix of the system.
     pub hessian: Mat6,
     /// The gradient of the system.
@@ -31,16 +34,6 @@ pub struct LMData {
     /// Estimated pose at the current state of iterations.
     pub model: Iso3,
 }
-
-/// Either a fully constructed `LMData`
-/// or an error containing the energy of the new iteration.
-///
-/// The error is returned when the new computed energy
-/// is higher than the previous iteration energy.
-pub type LMPartialState = Result<LMData, Float>;
-
-/// (inside_indices, residuals, energy).
-pub type PreEval = (Vec<usize>, Vec<Float>, Float);
 
 /// Precomputed data available for the optimizer iterations:
 pub struct Obs<'a> {
@@ -60,48 +53,14 @@ pub struct Obs<'a> {
     pub hessians: &'a Vec<Mat6>,
 }
 
-impl State<Iso3, Float> for LMState {
-    fn model(&self) -> &Iso3 {
-        &self.data.model
-    }
-    fn energy(&self) -> Float {
-        self.data.energy
-    }
-}
+/// (energy, inside_indices, residuals)
+type Precomputed = (Float, Vec<usize>, Vec<Float>);
 
-/// impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Iso3, PreEval, LMPartialState, Float> for LMOptimizer.
-impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Iso3, PreEval, LMPartialState, Float> for LMOptimizer {
-    /// Initial energy is f32::INFINITY.
-    fn initial_energy() -> Float {
-        f32::INFINITY
-    }
-
-    /// Compute the step using Levenberg-Marquardt.
-    /// May return an error at the Cholesky decomposition of the hessian.
-    fn compute_step(state: &LMState) -> Option<Vec6> {
-        let mut hessian = state.data.hessian.clone();
-        hessian.m11 = (1.0 + state.lm_coef) * hessian.m11;
-        hessian.m22 = (1.0 + state.lm_coef) * hessian.m22;
-        hessian.m33 = (1.0 + state.lm_coef) * hessian.m33;
-        hessian.m44 = (1.0 + state.lm_coef) * hessian.m44;
-        hessian.m55 = (1.0 + state.lm_coef) * hessian.m55;
-        hessian.m66 = (1.0 + state.lm_coef) * hessian.m66;
-        hessian.cholesky().map(|ch| ch.solve(&state.data.gradient))
-    }
-
-    /// Apply the step of an inverse compositional approach to compute the next pose estimation.
-    fn apply_step(delta: Vec6, model: &Iso3) -> Iso3 {
-        let delta_warp = se3::exp(delta);
-        let mut not_normalized = model * delta_warp.inverse();
-        not_normalized.rotation = re_normalize(not_normalized.rotation);
-        not_normalized
-    }
-
-    /// Compute residuals and energy of the new model.
-    fn pre_eval(obs: &Obs, model: &Iso3) -> PreEval {
+impl LMOptimizerState {
+    fn eval_energy(obs: &Obs, model: &Iso3) -> Precomputed {
         let mut inside_indices = Vec::new();
         let mut residuals = Vec::new();
-        let mut energy = 0.0;
+        let mut energy_sum = 0.0;
         for (idx, &(x, y)) in obs.coordinates.iter().enumerate() {
             let _z = obs._z_candidates[idx];
             // check if warp(x,y) is inside the image
@@ -110,36 +69,76 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Iso3, PreEval, LMPartialState, Float>
                 // precompute residuals and energy
                 let tmp = obs.template[(y, x)];
                 let r = im - tmp as Float;
-                energy = energy + r * r;
+                energy_sum = energy_sum + r * r;
                 residuals.push(r);
                 inside_indices.push(idx); // keep only inside points
             }
         }
-        energy = energy / residuals.len() as Float;
-        (inside_indices, residuals, energy)
+        let energy = energy_sum / residuals.len() as Float;
+        (energy, inside_indices, residuals)
     }
 
-    /// Evaluate the new hessian and gradient if the energy is lower than previously.
-    fn eval(obs: &Obs, energy: Float, pre_eval: PreEval, model: Iso3) -> LMPartialState {
-        let (inside_indices, residuals, new_energy) = pre_eval;
-        if new_energy > energy {
-            Err(new_energy)
+    fn compute_eval_data(obs: &Obs, model: Iso3, pre: Precomputed) -> EvalData {
+        let (energy, inside_indices, residuals) = pre;
+        let mut gradient = Vec6::zeros();
+        let mut hessian = Mat6::zeros();
+        for (i, idx) in inside_indices.iter().enumerate() {
+            let jac = obs.jacobians[*idx];
+            let hes = obs.hessians[*idx];
+            let r = residuals[i];
+            gradient = gradient + jac * r;
+            hessian = hessian + hes;
+        }
+        EvalData {
+            hessian,
+            gradient,
+            energy,
+            model,
+        }
+    }
+}
+
+/// impl<'a> Optimizer<Obs<'a>, LMState, Iso3, Float, EvalState, String> for LMOptimizer.
+impl<'a> OptimizerState<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState {
+    /// Initialize the optimizer state.
+    fn init(obs: &Obs, model: Iso3) -> Self {
+        Self {
+            lm_coef: 0.1,
+            eval_data: Self::compute_eval_data(obs, model, Self::eval_energy(obs, &model)),
+        }
+    }
+
+    /// Compute the step using Levenberg-Marquardt.
+    /// Apply the step of an inverse compositional approach to compute the next pose estimation.
+    /// May return an error at the Cholesky decomposition of the hessian.
+    fn step(&self) -> Result<Iso3, String> {
+        let mut hessian = self.eval_data.hessian.clone();
+        hessian.m11 = (1.0 + self.lm_coef) * hessian.m11;
+        hessian.m22 = (1.0 + self.lm_coef) * hessian.m22;
+        hessian.m33 = (1.0 + self.lm_coef) * hessian.m33;
+        hessian.m44 = (1.0 + self.lm_coef) * hessian.m44;
+        hessian.m55 = (1.0 + self.lm_coef) * hessian.m55;
+        hessian.m66 = (1.0 + self.lm_coef) * hessian.m66;
+        let delta = hessian
+            .cholesky()
+            .map(|ch| ch.solve(&self.eval_data.gradient))
+            .ok_or("Error at Cholesky decomposition of hessian")?;
+        let delta_warp = se3::exp(delta);
+        let mut motion = self.eval_data.model * delta_warp.inverse();
+        motion.rotation = re_normalize(motion.rotation);
+        Ok(motion)
+    }
+
+    /// Compute residuals and energy of the new model.
+    /// Then, evaluate the new hessian and gradient if the energy is lower than previously.
+    fn eval(&self, obs: &Obs, model: Iso3) -> EvalState {
+        let pre = Self::eval_energy(obs, &model);
+        let energy = pre.0;
+        let old_energy = self.eval_data.energy;
+        if energy > old_energy {
+            Err(energy)
         } else {
-            let mut gradient = Vec6::zeros();
-            let mut hessian = Mat6::zeros();
-            for (i, idx) in inside_indices.iter().enumerate() {
-                let jac = obs.jacobians[*idx];
-                let hes = obs.hessians[*idx];
-                let r = residuals[i];
-                gradient = gradient + jac * r;
-                hessian = hessian + hes;
-            }
-            Ok(LMData {
-                hessian,
-                gradient,
-                energy: new_energy,
-                model,
-            })
+            Ok(Self::compute_eval_data(obs, model, pre))
         }
     }
 
@@ -148,51 +147,44 @@ impl<'a> Optimizer<Obs<'a>, LMState, Vec6, Iso3, PreEval, LMPartialState, Float>
     ///
     /// Also updates the Levenberg-Marquardt coefficient
     /// depending on if the energy increased or decreased.
-    fn stop_criterion(
-        nb_iter: usize,
-        s0: LMState,
-        s1: LMPartialState,
-    ) -> (LMState, optim::Continue) {
+    fn stop_criterion(self, nb_iter: usize, eval_state: EvalState) -> (Self, Continue) {
         let too_many_iterations = nb_iter > 20;
-        match (s1, too_many_iterations) {
+        match (eval_state, too_many_iterations) {
             // Max number of iterations reached:
-            (Err(_), true) => (s0, optim::Continue::Stop),
-            (Ok(data), true) => {
-                // eprintln!("Energy: {}", data.energy);
-                // eprintln!("Gradient norm: {}", data.gradient.norm());
-                let kept_state = LMState {
-                    lm_coef: s0.lm_coef, // does not matter actually
-                    data: data,
+            (Err(_), true) => (self, Continue::Stop),
+            (Ok(eval_data), true) => {
+                // eprintln!("Energy: {}", eval_data.energy);
+                let kept_state = LMOptimizerState {
+                    lm_coef: self.lm_coef, // does not matter actually
+                    eval_data,
                 };
-                (kept_state, optim::Continue::Stop)
+                (kept_state, Continue::Stop)
             }
             // Can continue to iterate:
             (Err(_energy), false) => {
                 // eprintln!("\t back from: {}", energy);
-                let mut kept_state = s0;
+                let mut kept_state = self;
                 kept_state.lm_coef = 10.0 * kept_state.lm_coef;
-                (kept_state, optim::Continue::Forward)
+                (kept_state, Continue::Forward)
             }
-            (Ok(data), false) => {
-                let d_energy = s0.data.energy - data.energy;
-                let _gradient_norm = data.gradient.norm();
+            (Ok(eval_data), false) => {
+                let d_energy = self.eval_data.energy - eval_data.energy;
                 // 1.0 is totally empiric here
                 let continuation = if d_energy > 1.0 {
-                    optim::Continue::Forward
+                    Continue::Forward
                 } else {
-                    optim::Continue::Stop
+                    Continue::Stop
                 };
-                // eprintln!("Energy: {}", data.energy);
-                // eprintln!("Gradient norm: {}", gradient_norm);
-                let kept_state = LMState {
-                    lm_coef: 0.1 * s0.lm_coef,
-                    data: data,
+                // eprintln!("Energy: {}", eval_data.energy);
+                let kept_state = LMOptimizerState {
+                    lm_coef: 0.1 * self.lm_coef,
+                    eval_data,
                 };
                 (kept_state, continuation)
             }
         }
     } // fn stop_criterion
-} // impl Optimizer<...> for LMOptimizer
+} // impl OptimizerState<...> for LMOptimizerState
 
 // Helper ######################################################################
 
