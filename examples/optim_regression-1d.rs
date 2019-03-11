@@ -108,6 +108,7 @@ struct EvalData {
 type EvalState = Result<EvalData, f32>;
 
 impl LMOptimizerState {
+    /// Evaluate energy associated with a model.
     fn eval_energy(obs: &Obs, model: f32) -> (f32, DVec, DVec) {
         let f_model = f(model, &obs.x);
         let residuals = &f_model - &obs.y;
@@ -115,6 +116,7 @@ impl LMOptimizerState {
         (new_energy / residuals.len() as f32, residuals, f_model)
     }
 
+    /// Compute evaluation data needed for the next iteration step.
     fn compute_eval_data(obs: &Obs, model: f32, pre: (f32, DVec, DVec)) -> EvalData {
         let (energy, residuals, f_model) = pre;
         let jacobian = -1.0 * f_model.component_mul(&obs.x);
@@ -130,6 +132,8 @@ impl LMOptimizerState {
 }
 
 impl OptimizerState<Obs, EvalState, f32, String> for LMOptimizerState {
+    /// Initialize the optimizer state.
+    /// Levenberg-Marquardt coefficient start at 0.1.
     fn init(obs: &Obs, model: f32) -> Self {
         Self {
             lm_coef: 0.1,
@@ -143,6 +147,7 @@ impl OptimizerState<Obs, EvalState, f32, String> for LMOptimizerState {
         Ok(self.eval_data.model - self.eval_data.gradient / hessian)
     }
 
+    /// Evaluate the new model.
     fn eval(&self, obs: &Obs, model: f32) -> EvalState {
         let pre = Self::eval_energy(obs, model);
         let energy = pre.0;
@@ -154,13 +159,14 @@ impl OptimizerState<Obs, EvalState, f32, String> for LMOptimizerState {
         }
     }
 
+    /// Decide if iterations should continue.
     fn stop_criterion(self, nb_iter: usize, eval_state: EvalState) -> (Self, Continue) {
         let too_many_iterations = nb_iter >= 20;
         match (eval_state, too_many_iterations) {
             // Max number of iterations reached:
             (Err(_), true) => (self, Continue::Stop),
             (Ok(eval_data), true) => {
-                // println!("a = {}", eval_data.model);
+                println!("a = {}, energy = {}", eval_data.model, eval_data.energy);
                 let mut kept_state = self;
                 kept_state.eval_data = eval_data;
                 (kept_state, Continue::Stop)
