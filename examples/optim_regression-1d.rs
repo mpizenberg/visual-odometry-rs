@@ -47,7 +47,7 @@ fn run() -> Result<(), String> {
 
     // Let's generate some noisy observations.
     let nb_data: usize = 100;
-    let x_domain = linspace(-2.0, 3.0, nb_data);
+    let x_domain = linspace(-5.0, 3.0, nb_data);
     let seed = [0; 32];
     let mut rng: StdRng = SeedableRng::from_seed(seed);
     let mut distribution = Uniform::from(-1.0..1.0);
@@ -111,8 +111,8 @@ impl LMOptimizerState {
     fn eval_energy(obs: &Obs, model: f32) -> (f32, DVec, DVec) {
         let f_model = f(model, &obs.x);
         let residuals = &f_model - &obs.y;
-        let new_energy = residuals.iter().map(|r| r * r).sum();
-        (new_energy, residuals, f_model)
+        let new_energy: f32 = residuals.iter().map(|r| r * r).sum();
+        (new_energy / residuals.len() as f32, residuals, f_model)
     }
 
     fn compute_eval_data(obs: &Obs, model: f32, pre: (f32, DVec, DVec)) -> EvalData {
@@ -160,24 +160,30 @@ impl OptimizerState<Obs, EvalState, f32, String> for LMOptimizerState {
             // Max number of iterations reached:
             (Err(_), true) => (self, Continue::Stop),
             (Ok(eval_data), true) => {
-                println!("a = {}", eval_data.model);
+                // println!("a = {}", eval_data.model);
                 let mut kept_state = self;
                 kept_state.eval_data = eval_data;
                 (kept_state, Continue::Stop)
             }
             // Can continue to iterate:
             (Err(model), false) => {
-                println!("\t back from {}", model);
                 let mut kept_state = self;
                 kept_state.lm_coef = 10.0 * kept_state.lm_coef;
+                println!("\t back from {}, lm_coef = {}", model, kept_state.lm_coef);
                 (kept_state, Continue::Forward)
             }
             (Ok(eval_data), false) => {
-                println!("a = {}", eval_data.model);
+                println!("a = {}, energy = {}", eval_data.model, eval_data.energy);
+                let delta_energy = self.eval_data.energy - eval_data.energy;
                 let mut kept_state = self;
                 kept_state.lm_coef = 0.1 * kept_state.lm_coef;
                 kept_state.eval_data = eval_data;
-                (kept_state, Continue::Forward)
+                let continuation = if delta_energy > 0.01 {
+                    Continue::Forward
+                } else {
+                    Continue::Stop
+                };
+                (kept_state, continuation)
             }
         }
     }
