@@ -1,4 +1,4 @@
-//! Levenberg-Marquardt implementation of the Optimizer trait
+//! Levenberg-Marquardt implementation of the OptimizerState trait
 //! for the inverse compositional tracking algorithm.
 
 use nalgebra::{DMatrix, UnitQuaternion};
@@ -12,18 +12,18 @@ use crate::misc::type_aliases::{Float, Iso3, Mat6, Point2, Vec6};
 pub struct LMOptimizerState {
     /// Levenberg-Marquardt hessian diagonal coefficient.
     pub lm_coef: Float,
-    /// Data used during the optimizer iterations.
+    /// Data resulting of a successful model evaluation.
     pub eval_data: EvalData,
 }
 
-/// Either a fully constructed `LMData`
-/// or an error containing the energy of the new iteration.
+/// Either a successfully constructed `EvalData`
+/// or an error containing the energy of a given model.
 ///
 /// The error is returned when the new computed energy
 /// is higher than the previous iteration energy.
 pub type EvalState = Result<EvalData, Float>;
 
-/// Data needed during the optimizer iterations.
+/// Data resulting of a successful model evaluation.
 pub struct EvalData {
     /// The hessian matrix of the system.
     pub hessian: Mat6,
@@ -31,7 +31,7 @@ pub struct EvalData {
     pub gradient: Vec6,
     /// Energy associated with the current model.
     pub energy: Float,
-    /// Estimated pose at the current state of iterations.
+    /// Estimated motion at the current state of iterations.
     pub model: Iso3,
 }
 
@@ -57,6 +57,8 @@ pub struct Obs<'a> {
 type Precomputed = (Float, Vec<usize>, Vec<Float>);
 
 impl LMOptimizerState {
+    /// Precompute the energy of a model.
+    /// Also return the residuals vector and the indices of candidate points used.
     fn eval_energy(obs: &Obs, model: &Iso3) -> Precomputed {
         let mut inside_indices = Vec::new();
         let mut residuals = Vec::new();
@@ -78,13 +80,14 @@ impl LMOptimizerState {
         (energy, inside_indices, residuals)
     }
 
+    /// Fully evaluate a model.
     fn compute_eval_data(obs: &Obs, model: Iso3, pre: Precomputed) -> EvalData {
         let (energy, inside_indices, residuals) = pre;
         let mut gradient = Vec6::zeros();
         let mut hessian = Mat6::zeros();
-        for (i, idx) in inside_indices.iter().enumerate() {
-            let jac = obs.jacobians[*idx];
-            let hes = obs.hessians[*idx];
+        for (i, idx) in inside_indices.into_iter().enumerate() {
+            let jac = obs.jacobians[idx];
+            let hes = obs.hessians[idx];
             let r = residuals[i];
             gradient = gradient + jac * r;
             hessian = hessian + hes;
@@ -98,7 +101,7 @@ impl LMOptimizerState {
     }
 }
 
-/// impl<'a> Optimizer<Obs<'a>, LMState, Iso3, Float, EvalState, String> for LMOptimizer.
+/// impl<'a> OptimizerState<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState.
 impl<'a> OptimizerState<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState {
     /// Initialize the optimizer state.
     fn init(obs: &Obs, model: Iso3) -> Self {
@@ -109,7 +112,7 @@ impl<'a> OptimizerState<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState {
     }
 
     /// Compute the step using Levenberg-Marquardt.
-    /// Apply the step of an inverse compositional approach to compute the next pose estimation.
+    /// Apply the step in an inverse compositional approach to compute the next motion estimation.
     /// May return an error at the Cholesky decomposition of the hessian.
     fn step(&self) -> Result<Iso3, String> {
         let mut hessian = self.eval_data.hessian.clone();
@@ -119,18 +122,15 @@ impl<'a> OptimizerState<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState {
         hessian.m44 = (1.0 + self.lm_coef) * hessian.m44;
         hessian.m55 = (1.0 + self.lm_coef) * hessian.m55;
         hessian.m66 = (1.0 + self.lm_coef) * hessian.m66;
-        let delta = hessian
+        let cholesky = hessian
             .cholesky()
-            .map(|ch| ch.solve(&self.eval_data.gradient))
             .ok_or("Error at Cholesky decomposition of hessian")?;
-        let delta_warp = se3::exp(delta);
-        let mut motion = self.eval_data.model * delta_warp.inverse();
-        motion.rotation = re_normalize(motion.rotation);
-        Ok(motion)
+        let delta_warp = se3::exp(cholesky.solve(&self.eval_data.gradient));
+        Ok(renormalize(self.eval_data.model * delta_warp.inverse()))
     }
 
     /// Compute residuals and energy of the new model.
-    /// Then, evaluate the new hessian and gradient if the energy is lower than previously.
+    /// Then, evaluate the new hessian and gradient if the energy has decreased.
     fn eval(&self, obs: &Obs, model: Iso3) -> EvalState {
         let pre = Self::eval_energy(obs, &model);
         let energy = pre.0;
@@ -145,7 +145,7 @@ impl<'a> OptimizerState<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState {
     /// Stop after too many iterations,
     /// or if the energy variation is too low.
     ///
-    /// Also updates the Levenberg-Marquardt coefficient
+    /// Also update the Levenberg-Marquardt coefficient
     /// depending on if the energy increased or decreased.
     fn stop_criterion(self, nb_iter: usize, eval_state: EvalState) -> (Self, Continue) {
         let too_many_iterations = nb_iter > 20;
@@ -188,8 +188,15 @@ impl<'a> OptimizerState<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState {
 
 // Helper ######################################################################
 
+/// First order Taylor approximation for renormalization of rotation part of motion.
+fn renormalize(motion: Iso3) -> Iso3 {
+    let mut motion = motion;
+    motion.rotation = renormalize_unit_quaternion(motion.rotation);
+    motion
+}
+
 /// First order Taylor approximation for unit quaternion re-normalization.
-fn re_normalize(uq: UnitQuaternion<Float>) -> UnitQuaternion<Float> {
+fn renormalize_unit_quaternion(uq: UnitQuaternion<Float>) -> UnitQuaternion<Float> {
     let q = uq.into_inner();
     let sq_norm = q.norm_squared();
     UnitQuaternion::new_unchecked(0.5 * (3.0 - sq_norm) * q)

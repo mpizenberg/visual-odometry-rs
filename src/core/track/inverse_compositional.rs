@@ -228,9 +228,9 @@ impl Tracker {
             self.state.keyframe_img_timestamp = img_time;
             self.state.keyframe_pose = self.state.current_frame_pose;
         }
-    }
+    } // track
 
-    /// Retrieve the current frame pose and depth image timestamp.
+    /// Retrieve the current frame timestamp (of depth image) and pose.
     pub fn current_frame(&self) -> (f64, Iso3) {
         (
             self.state.current_frame_depth_timestamp,
@@ -346,16 +346,14 @@ fn warp_jacobian_at(
     let _fuv = 1.0 / (fu * fv);
 
     // Jacobian of the warp
-    #[rustfmt::skip]
-    let jac = Vec6::new(
-        gu * _z * fu,                                        //
-        _z * (gu * s + gv * fv),                             //  linear velocity terms
-        -_z * (gu * a + gv * b),                             //  ___
-        gu * (-a * b * _fv - s) + gv * (-b * b * _fv - fv),  //
-        gu * (a * c * _fuv + fu) + gv * (b * c * _fuv),      //  angular velocity terms
-        gu * (-fu * fu * b + s * c) * _fuv + gv * (c / fu),  //
-    );
-    jac
+    Vec6::new(
+        gu * _z * fu,                                       //
+        _z * (gu * s + gv * fv),                            //  linear velocity terms
+        -_z * (gu * a + gv * b),                            //  ___
+        gu * (-a * b * _fv - s) + gv * (-b * b * _fv - fv), //
+        gu * (a * c * _fuv + fu) + gv * (b * c * _fuv),     //  angular velocity terms
+        gu * (-fu * fu * b + s * c) * _fuv + gv * (c / fu), //
+    )
 }
 
 /// Compute hessians components for each candidate point.
