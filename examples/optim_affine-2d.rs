@@ -41,7 +41,11 @@ fn run(args: Vec<String>) -> Result<(), Box<Error>> {
     save_template(&template, image_path.parent().unwrap())?;
 
     // Precompute multi-resolution observations data.
-    let nb_levels = 5;
+    // We want roughly 200 points at the lowest resolution.
+    let nb_levels = std::cmp::max(
+        1,
+        (1.0 + (img.len() as f32 / 200.0).log(4.0)).round() as usize,
+    );
     let img_multires = multires::mean_pyramid(nb_levels, img);
     let template_multires = multires::mean_pyramid(nb_levels, template);
     let grad_multires: Vec<_> = template_multires.iter().map(gradient::centered).collect();
@@ -60,7 +64,7 @@ fn run(args: Vec<String>) -> Result<(), Box<Error>> {
             jacobians: &jacobians_multires[level],
             hessians: &hessians_multires[level],
         };
-        let (final_state, nb_iter) = LMOptimizerState::iterative_solve(&obs, model)?;
+        let (final_state, _nb_iter) = LMOptimizerState::iterative_solve(&obs, model)?;
         model = final_state.eval_data.model;
     }
 
@@ -119,7 +123,7 @@ impl LMOptimizerState {
                 y = 0;
             }
         }
-        energy = energy / residuals.len() as f32;
+        energy = energy / inside_indices.len() as f32;
         (energy, residuals, inside_indices)
     }
 
@@ -271,29 +275,29 @@ fn random_template(img: &Img) -> (Img, Mat23) {
     let a = rng.gen_range(-max_angle, max_angle);
 
     // Generate rotation and scaling matrix.
-    let m: Mat2 = Mat2::new(s_r * a.cos(), -s_c * a.sin(), s_r * a.sin(), s_c * a.cos());
+    let m: Mat2 = Mat2::new(s_c * a.cos(), -s_r * a.sin(), s_c * a.sin(), s_r * a.cos());
 
     // Project points to find suitable random translation range,
     // such that the template stays fully inside the image.
     #[rustfmt::skip]
     let corners = Mat24::new(
-        0.0, 0.0, img_rows-1.0, img_rows-1.0,
         0.0, img_cols-1.0, img_cols-1.0, 0.0,
+        0.0, 0.0, img_rows-1.0, img_rows-1.0,
     );
     let t_corners = m * corners;
-    let r_min = t_corners.row(0).min();
-    let r_max = t_corners.row(0).max();
-    let c_min = t_corners.row(1).min();
-    let c_max = t_corners.row(1).max();
+    let col_min = t_corners.row(0).min();
+    let col_max = t_corners.row(0).max();
+    let row_min = t_corners.row(1).min();
+    let row_max = t_corners.row(1).max();
 
     // Generate suitable random translation.
-    let t_rows_max = (-r_min + 1e-6).max(img_rows - 1.0 - r_max);
-    let t_cols_max = (-c_min + 1e-6).max(img_cols - 1.0 - c_max);
-    let t_rows = rng.gen_range(-r_min, t_rows_max);
-    let t_cols = rng.gen_range(-c_min, t_cols_max);
+    let t_cols_max = (-col_min + 1e-6).max(img_cols - 1.0 - col_max);
+    let t_rows_max = (-row_min + 1e-6).max(img_rows - 1.0 - row_max);
+    let t_cols = rng.gen_range(-col_min, t_cols_max);
+    let t_rows = rng.gen_range(-row_min, t_rows_max);
 
     // Build the affine transformation matrix.
-    let affine2d = Mat23::new(m.m11, m.m12, t_rows, m.m21, m.m22, t_cols);
+    let affine2d = Mat23::new(m.m11, m.m12, t_cols, m.m21, m.m22, t_rows);
     println!("affine2d: {}", affine2d);
 
     // Generate template image with this affine transformation.
@@ -359,14 +363,14 @@ fn warp_params(mat: Mat3) -> Vec6 {
 
 fn project(img: &Img, shape: (usize, usize), affine2d: &Mat23) -> Img {
     let (rows, cols) = shape;
-    let project_ij = |i, j| affine2d * Vec3::new(i as f32, j as f32, 1.0);
+    let project_ij = |i, j| affine2d * Vec3::new(j as f32, i as f32, 1.0);
     Img::from_fn(rows, cols, |i, j| interpolate_u8(&img, project_ij(i, j)))
 }
 
 /// Interpolate a pixel in the image.
 /// Bilinear interpolation, points are supposed to be fully inside img.
-fn interpolate_u8(img: &Img, t_ij: Vec2) -> u8 {
-    interpolate(t_ij[1], t_ij[0], img).unwrap() as u8
+fn interpolate_u8(img: &Img, pixel: Vec2) -> u8 {
+    interpolate(pixel.x, pixel.y, img).unwrap() as u8
 }
 
 fn interpolate(x: f32, y: f32, image: &Img) -> Option<f32> {
