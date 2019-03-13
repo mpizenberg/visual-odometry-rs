@@ -24,7 +24,7 @@ of a dataset following the TUM RGB-D format.
 Such association file contains data similar to:
 
 ```txt
-# format: depth_timestamp depth_file_path rgb_timestamp rgb_file_path
+# depth_timestamp depth_file_path rgb_timestamp rgb_file_path
 1305031102.160407 depth/1305031102.160407.png 1305031102.175304 rgb/1305031102.175304.png
 1305031102.226738 depth/1305031102.226738.png 1305031102.211214 rgb/1305031102.211214.png
 1305031102.262886 depth/1305031102.262886.png 1305031102.275326 rgb/1305031102.275326.png
@@ -32,6 +32,18 @@ Such association file contains data similar to:
 ```
 
 ### tum-read-trajectory
+
+This example shows how to read the trajectory file
+of a dataset following the TUM RGB-D format.
+Such trajectory file contains data similar to:
+
+```txt
+# ground truth trajectory
+# timestamp tx ty tz qx qy qz qw
+1305031098.6659 1.3563 0.6305 1.6380 0.6132 0.5962 -0.3311 -0.3986
+1305031098.6758 1.3543 0.6306 1.6360 0.6129 0.5966 -0.3316 -0.3980
+...
+```
 
 ## Candidates
 
