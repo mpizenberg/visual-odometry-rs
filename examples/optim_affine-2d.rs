@@ -5,9 +5,9 @@ extern crate visual_odometry_rs as vors;
 // use rand::{rngs::StdRng, Rng, SeedableRng};
 use rand::Rng;
 use std::{env, error::Error, f32::consts, path::Path, path::PathBuf, process::exit};
-use vors::misc::type_aliases::{Mat6, Vec6};
+use vors::math::optimizer::{Continue, OptimizerState};
+use vors::misc::type_aliases::{Mat3, Mat6, Vec3, Vec6};
 use vors::{core::gradient, core::multires, misc::interop};
-// use vors::math::optimizer::{Continue, OptimizerState};
 
 /// In this example, we attempt to find the affine 2D transformation
 /// between a template and another image.
@@ -22,7 +22,6 @@ type Mat24 = na::Matrix2x4<f32>;
 type Mat23 = na::Matrix2x3<f32>;
 type Img = na::DMatrix<u8>;
 type Vec2 = na::Vector2<f32>;
-type Vec3 = na::Vector3<f32>;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -42,41 +41,181 @@ fn run(args: Vec<String>) -> Result<(), Box<Error>> {
     save_template(&template, image_path.parent().unwrap())?;
 
     // Precompute multi-resolution observations data.
-    let img_multires = multires::mean_pyramid(5, img);
-    let template_multires = multires::mean_pyramid(5, template);
+    let nb_levels = 5;
+    let img_multires = multires::mean_pyramid(nb_levels, img);
+    let template_multires = multires::mean_pyramid(nb_levels, template);
     let grad_multires: Vec<_> = template_multires.iter().map(gradient::centered).collect();
     let jacobians_multires: Vec<_> = grad_multires.iter().map(affine_jacobians).collect();
     let hessians_multires: Vec<_> = jacobians_multires.iter().map(hessians_vec).collect();
+
+    // Multi-resolution optimization.
+    let mut model = Vec6::zeros();
+    for level in (0..nb_levels).rev() {
+        println!("---------------- Level {}:", level);
+        model[4] = 2.0 * model[4];
+        model[5] = 2.0 * model[5];
+        let obs = Obs {
+            template: &template_multires[level],
+            image: &img_multires[level],
+            jacobians: &jacobians_multires[level],
+            hessians: &hessians_multires[level],
+        };
+        let (final_state, nb_iter) = LMOptimizerState::iterative_solve(&obs, model)?;
+        model = final_state.eval_data.model;
+    }
+
+    // Display results.
+    println!("Ground truth: {}", affine2d);
+    println!("Computed:     {}", warp_mat(model));
     Ok(())
 }
 
 // OPTIMIZER ###################################################################
 
-fn affine_jacobians(grad: &(na::DMatrix<i16>, na::DMatrix<i16>)) -> Vec<Vec6> {
-    let (grad_x, grad_y) = grad;
-    let (nb_rows, _) = grad_x.shape();
-    let mut x = 0;
-    let mut y = 0;
-    let mut jacobians = Vec::with_capacity(grad_x.len());
-    for (&gx, &gy) in grad_x.iter().zip(grad_y.iter()) {
-        let gx_f = gx as f32;
-        let gy_f = gy as f32;
-        let x_f = x as f32;
-        let y_f = y as f32;
-        // CF Baker and Matthews.
-        let jac = Vec6::new(x_f * gx_f, x_f * gy_f, y_f * gx_f, y_f * gy_f, gx_f, gy_f);
-        jacobians.push(jac);
-        y = y + 1;
-        if y >= nb_rows {
-            x = x + 1;
-            y = 0;
-        }
-    }
-    jacobians
+struct Obs<'a> {
+    template: &'a Img,
+    image: &'a Img,
+    jacobians: &'a Vec<Vec6>,
+    hessians: &'a Vec<Mat6>,
 }
 
-fn hessians_vec(jacobians: &Vec<Vec6>) -> Vec<Mat6> {
-    jacobians.iter().map(|j| j * j.transpose()).collect()
+struct LMOptimizerState {
+    lm_coef: f32,
+    eval_data: EvalData,
+}
+
+struct EvalData {
+    model: Vec6,
+    energy: f32,
+    gradient: Vec6,
+    hessian: Mat6,
+}
+
+type EvalState = Result<EvalData, f32>;
+
+impl LMOptimizerState {
+    /// Evaluate energy associated with a model.
+    fn eval_energy(obs: &Obs, model: Vec6) -> (f32, Vec<f32>, Vec<usize>) {
+        let nb_pixels = obs.template.len();
+        let (nb_rows, _) = obs.template.shape();
+        let mut x = 0; // column "j"
+        let mut y = 0; // row "i"
+        let mut inside_indices = Vec::with_capacity(nb_pixels);
+        let mut residuals = Vec::with_capacity(nb_pixels);
+        let mut energy = 0.0;
+        for (idx, tmp) in obs.template.iter().enumerate() {
+            let (u, v) = warp(&model, x as f32, y as f32);
+            if let Some(im) = interpolate(u, v, &obs.image) {
+                // precompute residuals and energy
+                let r = im - *tmp as f32;
+                energy = energy + r * r;
+                residuals.push(r);
+                inside_indices.push(idx); // keep only inside points
+            }
+            // update x and y positions
+            y = y + 1;
+            if y >= nb_rows {
+                x = x + 1;
+                y = 0;
+            }
+        }
+        energy = energy / residuals.len() as f32;
+        (energy, residuals, inside_indices)
+    }
+
+    /// Compute evaluation data for the next iteration step.
+    fn compute_eval_data(obs: &Obs, model: Vec6, pre: (f32, Vec<f32>, Vec<usize>)) -> EvalData {
+        let (energy, residuals, inside_indices) = pre;
+        let mut gradient = Vec6::zeros();
+        let mut hessian = Mat6::zeros();
+        for (i, &idx) in inside_indices.iter().enumerate() {
+            let jac = obs.jacobians[idx];
+            let hes = obs.hessians[idx];
+            let res = residuals[i];
+            gradient = gradient + jac * res;
+            hessian = hessian + hes;
+        }
+        EvalData {
+            model,
+            energy,
+            gradient,
+            hessian,
+        }
+    }
+} // LMOptimizerState
+
+impl<'a> OptimizerState<Obs<'a>, EvalState, Vec6, String> for LMOptimizerState {
+    /// Initialize the optimizer state.
+    /// Levenberg-Marquardt coefficient start at 0.1.
+    fn init(obs: &Obs, model: Vec6) -> Self {
+        Self {
+            lm_coef: 0.1,
+            eval_data: Self::compute_eval_data(obs, model, Self::eval_energy(obs, model)),
+        }
+    }
+
+    /// Compute the Levenberg-Marquardt step.
+    fn step(&self) -> Result<Vec6, String> {
+        let mut hessian = self.eval_data.hessian.clone();
+        hessian.m11 = (1.0 + self.lm_coef) * hessian.m11;
+        hessian.m22 = (1.0 + self.lm_coef) * hessian.m22;
+        hessian.m33 = (1.0 + self.lm_coef) * hessian.m33;
+        hessian.m44 = (1.0 + self.lm_coef) * hessian.m44;
+        hessian.m55 = (1.0 + self.lm_coef) * hessian.m55;
+        hessian.m66 = (1.0 + self.lm_coef) * hessian.m66;
+        let cholesky = hessian.cholesky().ok_or("Error in cholesky.")?;
+        let delta = cholesky.solve(&self.eval_data.gradient);
+        let delta_warp = warp_mat(delta);
+        let old_warp = warp_mat(self.eval_data.model);
+        Ok(warp_params(old_warp * delta_warp.try_inverse().unwrap()))
+    }
+
+    /// Evaluate the new model.
+    fn eval(&self, obs: &Obs, model: Vec6) -> EvalState {
+        let pre = Self::eval_energy(obs, model);
+        let energy = pre.0;
+        let old_energy = self.eval_data.energy;
+        if energy > old_energy {
+            Err(energy)
+        } else {
+            Ok(Self::compute_eval_data(obs, model, pre))
+        }
+    }
+
+    /// Decide if iterations should continue.
+    fn stop_criterion(self, nb_iter: usize, eval_state: EvalState) -> (Self, Continue) {
+        let too_many_iterations = nb_iter >= 20;
+        match (eval_state, too_many_iterations) {
+            // Max number of iterations reached:
+            (Err(_), true) => (self, Continue::Stop),
+            (Ok(eval_data), true) => {
+                println!("energy = {}", eval_data.energy);
+                let mut kept_state = self;
+                kept_state.eval_data = eval_data;
+                (kept_state, Continue::Stop)
+            }
+            // Max number of iterations not reached yet:
+            (Err(energy), false) => {
+                let mut kept_state = self;
+                kept_state.lm_coef = 10.0 * kept_state.lm_coef;
+                println!("\t back from {}, lm_coef = {}", energy, kept_state.lm_coef);
+                (kept_state, Continue::Forward)
+            }
+            (Ok(eval_data), false) => {
+                println!("energy = {}", eval_data.energy);
+                let delta_energy = self.eval_data.energy - eval_data.energy;
+                let mut kept_state = self;
+                kept_state.lm_coef = 0.1 * kept_state.lm_coef;
+                kept_state.eval_data = eval_data;
+                let continuation = if delta_energy > 0.01 {
+                    Continue::Forward
+                } else {
+                    Continue::Stop
+                };
+                (kept_state, continuation)
+            }
+        }
+    }
 }
 
 // HELPERS #####################################################################
@@ -187,23 +326,98 @@ fn max_template_angle(ri: f32, ci: f32, rt: f32, ct: f32) -> f32 {
     threshold
 }
 
+fn warp(model: &Vec6, x: f32, y: f32) -> (f32, f32) {
+    (
+        (1.0 + model[0]) * x + model[2] * y + model[4],
+        model[1] * x + (1.0 + model[3]) * y + model[5],
+    )
+}
+
+/// Affine warp parameterization:
+/// [ 1+p1  p3  p5 ]
+/// [  p2  1+p4 p6 ]
+/// [  0    0   1  ]
+fn warp_mat(params: Vec6) -> Mat3 {
+    #[cfg_attr(rustfmt, rustfmt_skip)]
+    Mat3::new(
+        params[0] + 1.0, params[2],       params[4],
+        params[1],       params[3] + 1.0, params[5],
+        0.0,             0.0,             1.0,
+    )
+}
+
+fn warp_params(mat: Mat3) -> Vec6 {
+    Vec6::new(
+        mat.m11 - 1.0,
+        mat.m21,
+        mat.m12,
+        mat.m22 - 1.0,
+        mat.m13,
+        mat.m23,
+    )
+}
+
 fn project(img: &Img, shape: (usize, usize), affine2d: &Mat23) -> Img {
     let (rows, cols) = shape;
     let project_ij = |i, j| affine2d * Vec3::new(i as f32, j as f32, 1.0);
-    Img::from_fn(rows, cols, |i, j| interpolate(&img, project_ij(i, j)))
+    Img::from_fn(rows, cols, |i, j| interpolate_u8(&img, project_ij(i, j)))
 }
 
 /// Interpolate a pixel in the image.
-fn interpolate(img: &Img, t_ij: Vec2) -> u8 {
-    // Bilinear interpolation, points are supposed to be fully inside img.
-    let (x, y) = (t_ij.x, t_ij.y);
-    let row = x.floor() as usize;
-    let col = y.floor() as usize;
-    let a = x - x.floor();
-    let b = y - y.floor();
-    let color = a * b * img[(row + 1, col + 1)] as f32
-        + a * (1.0 - b) * img[(row + 1, col)] as f32
-        + (1.0 - a) * (1.0 - b) * img[(row, col)] as f32
-        + (1.0 - a) * b * img[(row, col + 1)] as f32;
-    color as u8
+/// Bilinear interpolation, points are supposed to be fully inside img.
+fn interpolate_u8(img: &Img, t_ij: Vec2) -> u8 {
+    interpolate(t_ij[1], t_ij[0], img).unwrap() as u8
+}
+
+fn interpolate(x: f32, y: f32, image: &Img) -> Option<f32> {
+    let (height, width) = image.shape();
+    let u = x.floor();
+    let v = y.floor();
+    if u >= 0.0 && u < (width - 2) as f32 && v >= 0.0 && v < (height - 2) as f32 {
+        let u_0 = u as usize;
+        let v_0 = v as usize;
+        let u_1 = u_0 + 1;
+        let v_1 = v_0 + 1;
+        let vu_00 = image[(v_0, u_0)] as f32;
+        let vu_10 = image[(v_1, u_0)] as f32;
+        let vu_01 = image[(v_0, u_1)] as f32;
+        let vu_11 = image[(v_1, u_1)] as f32;
+        let a = x - u;
+        let b = y - v;
+        Some(
+            (1.0 - b) * (1.0 - a) * vu_00
+                + b * (1.0 - a) * vu_10
+                + (1.0 - b) * a * vu_01
+                + b * a * vu_11,
+        )
+    } else {
+        None
+    }
+}
+
+fn affine_jacobians(grad: &(na::DMatrix<i16>, na::DMatrix<i16>)) -> Vec<Vec6> {
+    let (grad_x, grad_y) = grad;
+    let (nb_rows, _) = grad_x.shape();
+    let mut x = 0;
+    let mut y = 0;
+    let mut jacobians = Vec::with_capacity(grad_x.len());
+    for (&gx, &gy) in grad_x.iter().zip(grad_y.iter()) {
+        let gx_f = gx as f32;
+        let gy_f = gy as f32;
+        let x_f = x as f32;
+        let y_f = y as f32;
+        // CF Baker and Matthews.
+        let jac = Vec6::new(x_f * gx_f, x_f * gy_f, y_f * gx_f, y_f * gy_f, gx_f, gy_f);
+        jacobians.push(jac);
+        y = y + 1;
+        if y >= nb_rows {
+            x = x + 1;
+            y = 0;
+        }
+    }
+    jacobians
+}
+
+fn hessians_vec(jacobians: &Vec<Vec6>) -> Vec<Mat6> {
+    jacobians.iter().map(|j| j * j.transpose()).collect()
 }
