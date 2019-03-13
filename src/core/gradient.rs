@@ -36,6 +36,25 @@ pub fn squared_norm(grad_x: &na::DMatrix<i16>, grad_y: &na::DMatrix<i16>) -> na:
     })
 }
 
+/// Compute squared gradient norm directly from the image.
+pub fn squared_norm_direct(im: &na::DMatrix<u8>) -> na::DMatrix<u16> {
+    let (nb_rows, nb_cols) = im.shape();
+    let top = im.slice((0, 1), (nb_rows - 2, nb_cols - 2));
+    let bottom = im.slice((2, 1), (nb_rows - 2, nb_cols - 2));
+    let left = im.slice((1, 0), (nb_rows - 2, nb_cols - 2));
+    let right = im.slice((1, 2), (nb_rows - 2, nb_cols - 2));
+    let mut squared_norm_mat = na::DMatrix::zeros(nb_rows, nb_cols);
+    let mut grad_inner = squared_norm_mat.slice_mut((1, 1), (nb_rows - 2, nb_cols - 2));
+    for j in 0..nb_cols - 2 {
+        for i in 0..nb_rows - 2 {
+            let gx = right[(i, j)] as i32 - left[(i, j)] as i32;
+            let gy = bottom[(i, j)] as i32 - top[(i, j)] as i32;
+            grad_inner[(i, j)] = ((gx * gx + gy * gy) / 4) as u16;
+        }
+    }
+    squared_norm_mat
+}
+
 // BLOCS 2x2 ###################################################################
 
 /// Horizontal gradient in a 2x2 pixels block.

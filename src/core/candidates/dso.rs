@@ -98,7 +98,6 @@ pub fn select<T: Number<T>>(
     // Pick all block candidates
     let median_gradients = region_median_gradients(gradients, region_config.size);
     let regions_thresholds = region_thresholds(&median_gradients, region_config.threshold_coefs);
-    // println!("base_size: {}", block_config.base_size);
     let (vec_nb_candidates, picked) = pick_all_block_candidates(
         block_config,
         region_config.size,
@@ -106,7 +105,8 @@ pub fn select<T: Number<T>>(
         gradients,
     );
     let nb_candidates: usize = vec_nb_candidates.iter().sum();
-    // println!("nb_candidates: {}", nb_candidates);
+    // eprintln!("Number of points picked by level: {:?}", vec_nb_candidates);
+    // eprintln!("nb_candidates: {}", nb_candidates);
     let candidates_ratio = nb_candidates as Float / nb_target as Float;
     // The number of selected pixels behave approximately as
     // nb_candidates = K / (block_size + 1)^2 where K is scene dependant.
@@ -116,7 +116,8 @@ pub fn select<T: Number<T>>(
     // target_size = sqrt( ratio ) * (block_size + 1) - 1
     let target_size = candidates_ratio.sqrt() * (block_config.base_size as Float + 1.0) - 1.0;
     let target_size = std::cmp::max(1, target_size.round() as i32) as usize;
-    // println!("target_size: {}", target_size);
+    // eprintln!("base_size:   {}", block_config.base_size);
+    // eprintln!("target_size: {}", target_size);
     if candidates_ratio < recursive_config.low_thresh {
         if target_size != block_config.base_size && recursive_config.nb_iterations_left > 0 {
             let mut b_config = block_config;
