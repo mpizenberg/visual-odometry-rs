@@ -10,6 +10,7 @@ use nalgebra::DMatrix;
 use crate::core::{
     camera::Intrinsics,
     candidates::coarse_to_fine as candidates,
+    gradient,
     inverse_depth::{self, InverseDepth},
     multires,
     track::lm_optimizer::{self, LMOptimizerState},
@@ -103,10 +104,10 @@ fn precompute_multires_data(
 ) -> MultiresData {
     // Precompute multi-resolution of keyframe gradients.
     let mut gradients_multires = multires::gradients_xy(&img_multires);
-    gradients_multires.insert(0, im_gradient(&img_multires[0]));
+    gradients_multires.insert(0, gradient::centered(&img_multires[0]));
     let gradients_squared_norm_multires: Vec<_> = gradients_multires
         .iter()
-        .map(|(gx, gy)| grad_squared_norm(gx, gy))
+        .map(|(gx, gy)| gradient::squared_norm(gx, gy))
         .collect();
 
     // Precompute mask of candidate points for tracking.
@@ -245,38 +246,6 @@ impl Tracker {
 //     let w = uq.into_inner().scalar();
 //     2.0 * uq.into_inner().vector().norm().atan2(w)
 // }
-
-/// Compute x and y centered gradients of an image.
-/// Border pixels gradients are set to 0.
-fn im_gradient(im: &DMatrix<u8>) -> (DMatrix<i16>, DMatrix<i16>) {
-    // TODO: move to the gradients module.
-    // TODO: might be better to return DMatrix<(i16,i16)>?
-    let (nb_rows, nb_cols) = im.shape();
-    let top = im.slice((0, 1), (nb_rows - 2, nb_cols - 2));
-    let bottom = im.slice((2, 1), (nb_rows - 2, nb_cols - 2));
-    let left = im.slice((1, 0), (nb_rows - 2, nb_cols - 2));
-    let right = im.slice((1, 2), (nb_rows - 2, nb_cols - 2));
-    let mut grad_x = DMatrix::zeros(nb_rows, nb_cols);
-    let mut grad_y = DMatrix::zeros(nb_rows, nb_cols);
-    let mut grad_x_inner = grad_x.slice_mut((1, 1), (nb_rows - 2, nb_cols - 2));
-    let mut grad_y_inner = grad_y.slice_mut((1, 1), (nb_rows - 2, nb_cols - 2));
-    for j in 0..nb_cols - 2 {
-        for i in 0..nb_rows - 2 {
-            grad_x_inner[(i, j)] = (right[(i, j)] as i16 - left[(i, j)] as i16) / 2;
-            grad_y_inner[(i, j)] = (bottom[(i, j)] as i16 - top[(i, j)] as i16) / 2;
-        }
-    }
-    (grad_x, grad_y)
-}
-
-/// Compute squared gradient norm from x and y gradient matrices.
-fn grad_squared_norm(grad_x: &DMatrix<i16>, grad_y: &DMatrix<i16>) -> DMatrix<u16> {
-    grad_x.zip_map(grad_y, |gx, gy| {
-        let gx = gx as i32;
-        let gy = gy as i32;
-        (gx * gx + gy * gy) as u16
-    })
-}
 
 /// Extract known inverse depth values (and coordinates) into vectorized data.
 fn extract_z(idepth_mat: &DMatrix<InverseDepth>) -> (Vec<(usize, usize)>, Vec<Float>) {
