@@ -5,7 +5,8 @@ extern crate visual_odometry_rs as vors;
 // use rand::{rngs::StdRng, Rng, SeedableRng};
 use rand::Rng;
 use std::{env, error::Error, f32::consts, path::Path, path::PathBuf, process::exit};
-use vors::misc::interop;
+use vors::misc::type_aliases::{Mat6, Vec6};
+use vors::{core::gradient, core::multires, misc::interop};
 // use vors::math::optimizer::{Continue, OptimizerState};
 
 /// In this example, we attempt to find the affine 2D transformation
@@ -32,12 +33,53 @@ fn main() {
 }
 
 fn run(args: Vec<String>) -> Result<(), Box<Error>> {
+    // Load image.
     let image_path = check_args(args)?;
     let img = read_image(&image_path)?;
+
+    // Extract template.
     let (template, affine2d) = random_template(&img);
     save_template(&template, image_path.parent().unwrap())?;
+
+    // Precompute multi-resolution observations data.
+    let img_multires = multires::mean_pyramid(5, img);
+    let template_multires = multires::mean_pyramid(5, template);
+    let grad_multires: Vec<_> = template_multires.iter().map(gradient::centered).collect();
+    let jacobians_multires: Vec<_> = grad_multires.iter().map(affine_jacobians).collect();
+    let hessians_multires: Vec<_> = jacobians_multires.iter().map(hessians_vec).collect();
     Ok(())
 }
+
+// OPTIMIZER ###################################################################
+
+fn affine_jacobians(grad: &(na::DMatrix<i16>, na::DMatrix<i16>)) -> Vec<Vec6> {
+    let (grad_x, grad_y) = grad;
+    let (nb_rows, _) = grad_x.shape();
+    let mut x = 0;
+    let mut y = 0;
+    let mut jacobians = Vec::with_capacity(grad_x.len());
+    for (&gx, &gy) in grad_x.iter().zip(grad_y.iter()) {
+        let gx_f = gx as f32;
+        let gy_f = gy as f32;
+        let x_f = x as f32;
+        let y_f = y as f32;
+        // CF Baker and Matthews.
+        let jac = Vec6::new(x_f * gx_f, x_f * gy_f, y_f * gx_f, y_f * gy_f, gx_f, gy_f);
+        jacobians.push(jac);
+        y = y + 1;
+        if y >= nb_rows {
+            x = x + 1;
+            y = 0;
+        }
+    }
+    jacobians
+}
+
+fn hessians_vec(jacobians: &Vec<Vec6>) -> Vec<Mat6> {
+    jacobians.iter().map(|j| j * j.transpose()).collect()
+}
+
+// HELPERS #####################################################################
 
 fn check_args(args: Vec<String>) -> Result<PathBuf, Box<Error>> {
     if args.len() != 2 {
