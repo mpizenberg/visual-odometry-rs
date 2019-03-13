@@ -19,6 +19,18 @@ cargo run --release --example example_name [example_arguments]
 
 ### tum-read-associations
 
+This example shows how to read the associations file
+of a dataset following the TUM RGB-D format.
+Such association file contains data similar to:
+
+```txt
+# format: depth_timestamp depth_file_path rgb_timestamp rgb_file_path
+1305031102.160407 depth/1305031102.160407.png 1305031102.175304 rgb/1305031102.175304.png
+1305031102.226738 depth/1305031102.226738.png 1305031102.211214 rgb/1305031102.211214.png
+1305031102.262886 depth/1305031102.262886.png 1305031102.275326 rgb/1305031102.275326.png
+...
+```
+
 ### tum-read-trajectory
 
 ## Candidates
