@@ -85,7 +85,7 @@ cargo run --release --example candidates_coarse-to-fine /path/to/image
 
 ### dso
 
-The candidates selection in DSO is quite different, and requires far more parameters.
+The candidates selection in [DSO][dso] is quite different, and requires far more parameters.
 At its heart, it consists of picking the highest gradient magnitude point per block.
 A block being a rectangular group of pixels.
 In practice there are many more complications.
@@ -102,17 +102,20 @@ This will create an image named `candidates.png` in the directory where the imag
 cargo run --release --example candidates_dso /path/to/image
 ```
 
+[dso]: https://github.com/JakobEngel/dso
+
 ## Optimization
 
 In order to solve the non-linear problem of camera tracking by some energy minimization,
 there was a need to implement non-linear iterative solvers.
 In particular, I implemented a [Levenberg-Marquardt][levenberg] least square optimization.
 In the library code, the two modules inside `core::track` are an implementation of such algorithm.
-They minimize a reprojection error, in an inverse compositional approach,
+They minimize a reprojection error, in an [inverse compositional approach][baker],
 and a parameterization of the [rigid body motion][rigid-transformation]
-in the Lie Algebra of twists [se3][lie].
+in the Lie algebra of twists [se3][lie].
 
 [levenberg]: https://en.wikipedia.org/wiki/Levenberg%E2%80%93Marquardt_algorithm
+[baker]: http://www.ncorr.com/download/publications/bakerunify.pdf
 [rigid-transformation]: https://en.wikipedia.org/wiki/Rigid_transformation
 [lie]: http://ethaneade.com/lie.pdf
 
@@ -133,9 +136,10 @@ pub trait OptimizerState<Observations, EvalState, Model, Error> {
 }
 ```
 
-It means that if you implement `init`, `step`, `eval` and `stop_criterion` for a struct,
-you will be able to call `my_struct.iterative_solve(obs, model)` to get the solution.
-The implementation of `iterative_solve` is quite straitforward so don't hesitate to have a look at it.
+It means that if you implement `init`, `step`, `eval` and `stop_criterion` for a struct
+of your custom type `MyOptimizer`, you will be able to call
+`MyOptimizer::iterative_solve(obs, model)` to get the solution.
+The implementation of `iterative_solve` is quite straightforward so don't hesitate to have a look at it.
 
 Details about the generic types and the four functions to implement are in the documentation.
 Simpler use cases than the camera tracking one are present in the following examples however.
@@ -144,7 +148,7 @@ Simpler use cases than the camera tracking one are present in the following exam
 
 ![Regression of exponential data][optim_regression-1d]
 
-[optim_regression-1d]: mpizenberg.github.io/resources/vors/optim_regression-1d.svg
+[optim_regression-1d]: https://mpizenberg.github.io/resources/vors/optim_regression-1d.svg
 
 ### rosenbrock
 
