@@ -7,7 +7,7 @@ use rand::{distributions::Uniform, rngs::StdRng, SeedableRng};
 use std::{f32, process::exit};
 use vors::math::optimizer::{Continue, OptimizerState};
 
-/// In this example, we implement the Optimizer trait to find the correct parameter `a`
+/// In this example, we implement the `OptimizerState` trait to find the correct parameter `a`
 /// for modelling a noisy curve of the form: y = exp( -a * x ).
 /// Let f be the function: (a, x) -> exp( -a * x ).
 ///

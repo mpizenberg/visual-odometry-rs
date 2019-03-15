@@ -150,6 +150,19 @@ Simpler use cases than the camera tracking one are present in the following exam
 
 [optim_regression-1d]: https://mpizenberg.github.io/resources/vors/optim_regression-1d.svg
 
+In this example, we implement the `OptimizerState` trait
+to find the correct parameter `a` for modelling exponentially decreasing noisy data.
+It is implemented using a [Levenberg-Marquardt][levenberg] approach,
+but simpler approaches would have also worked.
+Details of the computation of the Jacobian and Hessian approximation are
+provided at the beginning of the example file.
+
+You can run the example as follows:
+
+```sh
+cargo run --releas --example optim_regression-1d
+```
+
 ### rosenbrock
 
 ### affine-2d
