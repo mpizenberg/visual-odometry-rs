@@ -165,4 +165,11 @@ cargo run --releas --example optim_regression-1d
 
 ### rosenbrock
 
+![Rosenbrock function][rosenbrock-png]
+
+_3D visualization of the Rosenbrock function,
+By Morn the Gorn - Own work, Public Domain_
+
+[rosenbrock-png]: https://mpizenberg.github.io/resources/vors/rosenbrock.png
+
 ### affine-2d
