@@ -142,7 +142,7 @@ of your custom type `MyOptimizer`, you will be able to call
 The implementation of `iterative_solve` is quite straightforward so don't hesitate to have a look at it.
 
 Details about the generic types and the four functions to implement are in the documentation.
-Simpler use cases than the camera tracking one are present in the following examples however.
+Simpler use cases than the camera tracking one are present in the following examples.
 
 ### regression-1d
 
@@ -189,3 +189,33 @@ cargo run --release --example optim_rosenbrock
 [rosenbrock]: https://en.wikipedia.org/wiki/Rosenbrock_function
 
 ### affine-2d
+
+![Affine transformation][affine2d-jpg]
+
+[affine2d-jpg]: https://mpizenberg.github.io/resources/vors/affine2d.jpg
+
+_Original image on the left, automatically extracted "template" on the right._
+
+In this example, we find the parameters of the affine transformation from
+the extracted "template" image on the right to the original image on the left.
+In the example we randomly generate the affine transformation,
+represented by the following matrix in homogeneous coordinates:
+
+```
+[ 1+p1  p3  p5 ]
+[  p2  1+p4 p6 ]
+[  0    0   1  ]
+```
+
+Just like for the camera tracking, the resolution uses an [inverse compositional approach][baker],
+in a Levenberg-Marquardt optimization algorithm.
+It also uses a multi-scale approach, where the solution at one level serves
+as an initialization for the next one.
+This exercise on a 2D affine transformation was very useful before implementing
+the actual 3D camera reprojection optimization.
+
+You can run the example as follows:
+
+```sh
+cargo run --release --example optim_affine-2d /path/to/image
+```
