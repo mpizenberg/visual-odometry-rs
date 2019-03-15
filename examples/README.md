@@ -104,7 +104,47 @@ cargo run --release --example candidates_dso /path/to/image
 
 ## Optimization
 
+In order to solve the non-linear problem of camera tracking by some energy minimization,
+there was a need to implement non-linear iterative solvers.
+In particular, I implemented a [Levenberg-Marquardt][levenberg] least square optimization.
+In the library code, the two modules inside `core::track` are an implementation of such algorithm.
+They minimize a reprojection error, in an inverse compositional approach,
+and a parameterization of the [rigid body motion][rigid-transformation]
+in the Lie Algebra of twists [se3][lie].
+
+[levenberg]: https://en.wikipedia.org/wiki/Levenberg%E2%80%93Marquardt_algorithm
+[rigid-transformation]: https://en.wikipedia.org/wiki/Rigid_transformation
+[lie]: http://ethaneade.com/lie.pdf
+
+After a lot of API trial and error,
+I ended with a code structure suitable for any iterative optimization algorithm.
+This "structure" has been formalized by the trait `OptimizerState` in the module `math::optimizer`.
+It basically goes as follows (see documentation for details).
+
+```rust
+pub trait OptimizerState<Observations, EvalState, Model, Error> {
+    fn init(obs: &Observations, model: Model) -> Self;
+    fn step(&self) -> Result<Model, Error>;
+    fn eval(&self, obs: &Observations, new_model: Model) -> EvalState;
+    fn stop_criterion(self, nb_iter: usize, eval_state: EvalState) -> (Self, Continue);
+    fn iterative_solve(obs: &Observations, initial_model: Model) -> Result<(Self, usize), Error> {
+        ...
+    }
+}
+```
+
+It means that if you implement `init`, `step`, `eval` and `stop_criterion` for a struct,
+you will be able to call `my_struct.iterative_solve(obs, model)` to get the solution.
+The implementation of `iterative_solve` is quite straitforward so don't hesitate to have a look at it.
+
+Details about the generic types and the four functions to implement are in the documentation.
+Simpler use cases than the camera tracking one are present in the following examples however.
+
 ### regression-1d
+
+![Regression of exponential data][optim_regression-1d]
+
+[optim_regression-1d]: mpizenberg.github.io/resources/vors/optim_regression-1d.svg
 
 ### rosenbrock
 
