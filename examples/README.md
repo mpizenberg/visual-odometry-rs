@@ -73,9 +73,34 @@ They contain respectively 609, 948, 1546 and 2636 candidate points.
 
 ![candidates coarse to fine][candidates-coarse-to-fine]
 
+You can run this candidates selection algorithm on an image of your choice as follows.
+This will create multiple png images named `candidates_0.png`, `candidates_1.png` ...
+in the directory where the image lives.
+
+```sh
+cargo run --release --example candidates_coarse-to-fine /path/to/image
+```
+
 [candidates-coarse-to-fine]: https://mpizenberg.github.io/resources/vors/candidates-coarse-to-fine.png
 
 ### dso
+
+The candidates selection in DSO is quite different, and requires far more parameters.
+At its heart, it consists of picking the highest gradient magnitude point per block.
+A block being a rectangular group of pixels.
+In practice there are many more complications.
+A pixel is only selected if its gradient magnitude is higher than a threshold,
+computed as the sum of a global constant, and a the median gradient magnitude of the current "region".
+Regions being like blocks but bigger.
+There are other details, like multiple levels, with lower thresholds,
+and possible random sub-selection to achieve an objective amount of points.
+
+You can run this candidates selection algorithm on an image of your choice as follows.
+This will create an image named `candidates.png` in the directory where the image lives.
+
+```sh
+cargo run --release --example candidates_dso /path/to/image
+```
 
 ## Optimization
 
