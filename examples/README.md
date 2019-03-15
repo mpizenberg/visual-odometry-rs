@@ -170,6 +170,22 @@ cargo run --releas --example optim_regression-1d
 _3D visualization of the Rosenbrock function,
 By Morn the Gorn - Own work, Public Domain_
 
+The [Rosenbrock function][rosenbrock] is very often used to compare optimization algorithms.
+It is defined by: `f: (a, b, x, y) -> (a-x)^2 + b*(y-x^2)^2`.
+
+Given `a` and `b` fixed as constants,
+the global minimum of the rosenbrock function is obtained for `(x, y) = (a, a^2)`
+where its value is 0.
+Again, the implementation in the example is using the Levenberg-Marquardt algorithm.
+In the example code, we define `(a, b) = (1, 100)` and so the minimum is obtained for
+`(x, y) = (1, 1)`.
+You can run the example as follows:
+
+```sh
+cargo run --release --example optim_rosenbrock
+```
+
 [rosenbrock-png]: https://mpizenberg.github.io/resources/vors/rosenbrock.png
+[rosenbrock]: https://en.wikipedia.org/wiki/Rosenbrock_function
 
 ### affine-2d
