@@ -8,7 +8,8 @@ The program works on datasets following the [TUM RGB-D dataset format][tum-rgbd]
 It is roughly a hundred lines of code (see `src/bin/vors_track.rs`),
 built upon the visual-odometry-rs crate also provided here.
 
-You can run the binary program `vors_track` with cargo directly as follows:
+Once you have cloned this repository,
+you can run the binary program `vors_track` with cargo directly as follows:
 
 ```sh
 cargo run --release --bin vors_track -- fr1 /path/to/some/freiburg1/dataset/associations.txt
@@ -30,6 +31,11 @@ The library is organized around four base namespaces:
 [tum-rgbd]: https://vision.in.tum.de/data/datasets/rgbd-dataset
 [rgbd-track-eval]: https://github.com/mpizenberg/rgbd-tracking-evaluation
 [nalgebra]: https://www.nalgebra.org/
+
+## Library Usage Examples
+
+Self contained examples for usage of the API are available in the `examples/` directory.
+A readme is also present there for more detailed explanations on these examples.
 
 ## Functionalities and Vision
 
