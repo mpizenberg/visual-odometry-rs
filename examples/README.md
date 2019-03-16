@@ -207,14 +207,26 @@ represented by the following matrix in homogeneous coordinates:
 [  0    0   1  ]
 ```
 
-Just like for the camera tracking, the resolution uses an [inverse compositional approach][baker],
-in a Levenberg-Marquardt optimization algorithm.
+We then optimize a direct image alignment problem of the form:
+
+```
+residual(x) = I(warp(x)) - T(x)
+```
+
+Where `T` is a template image,
+`I` an transformed image by a warp function (that should align with our original image),
+`x` a pixel coordinates in the template image,
+`warp` a 2D affine transformation of the form described above.
+
+Just like for the camera tracking, the resolution uses an inverse compositional approach
+as described in [Baker and Matthews, 2001][baker],
+with a Levenberg-Marquardt optimization algorithm.
 It also uses a multi-scale approach, where the solution at one level serves
 as an initialization for the next one.
 This exercise on a 2D affine transformation was very useful before implementing
 the actual 3D camera reprojection optimization.
 
-You can run the example as follows:
+You can run the example with the image of your choosing as follows:
 
 ```sh
 cargo run --release --example optim_affine-2d /path/to/image
