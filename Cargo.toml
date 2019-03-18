@@ -4,44 +4,24 @@ version = "0.1.0"
 authors = ["Matthieu Pizenberg <matthieu.pizenberg@gmail.com>"]
 edition = "2018"
 
+
 [dependencies]
-
-# Encoding/decoding images in Rust.
-image = "0.19"
+image = "0.19" # Encoding/decoding images in Rust.
 png = "0.12"
-
-# Reading numbers in [big/little]-endian.
-byteorder = "1.2"
-
-# Linear algebra.
-nalgebra = "0.17"
-
-# Random number generators.
-rand = "0.6"
-
-# Useful numeric traits.
-num-traits = "0.2"
-
-# Parsing files.
-nom = "4.2"
-
-# More iterators.
-itertools = "0.7"
+byteorder = "1.2" # Reading numbers in [big/little]-endian.
+nalgebra = "0.17" # Linear algebra.
+rand = "0.6" # Random number generators.
+num-traits = "0.2" # Useful numeric traits.
+nom = "4.2" # Parsing files.
+itertools = "0.7" # More iterators.
 
 
 [dev-dependencies]
+quickcheck = "0.8" # Property based testing.
+approx = "0.3" # Approximate equalities.
+csv = "1" # CSV.
+criterion = "0.2" # Benchmarks.
 
-# Property based testing.
-quickcheck = "0.8"
-
-# Approximate equalities.
-approx = "0.3"
-
-# CSV.
-csv = "1"
-
-# Benchmarks.
-criterion = "0.2"
 
 [[bench]]
 name = "png_read"
