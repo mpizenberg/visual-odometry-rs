@@ -4,6 +4,14 @@ version = "0.1.0"
 authors = ["Matthieu Pizenberg <matthieu.pizenberg@gmail.com>"]
 edition = "2018"
 
+description = "Visual odometry in Rust (vors)"
+homepage = "https://github.com/mpizenberg/visual-odometry-rs"
+repository = "https://github.com/mpizenberg/visual-odometry-rs"
+readme = "README.md"
+keywords = ["odometry", "slam", "vision", "rgbd"] # up to 5 keywords
+categories = ["science::robotics", "multimedia::video"] # up to 5 categories, cf crates.io/category_slugs
+license = "MPL-2.0" # SPDX license
+
 
 [dependencies]
 image = "0.19" # Encoding/decoding images in Rust.
