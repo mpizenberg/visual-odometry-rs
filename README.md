@@ -92,3 +92,9 @@ including:
 [vo-slides]: http://wavelab.uwaterloo.ca/slam/2017-SLAM/Lecture14-Direct_visual_inertial_odometry_and_SLAM/slides.pdf
 [dso]: https://github.com/JakobEngel/dso
 [rust]: https://www.rust-lang.org/
+
+## License (MPL-2.0)
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
