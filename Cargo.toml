@@ -26,6 +26,7 @@ itertools = "0.7" # More iterators.
 
 [dev-dependencies]
 quickcheck = "0.8" # Property based testing.
+quickcheck_macros = "0.8"
 approx = "0.3" # Approximate equalities.
 csv = "1" # CSV.
 criterion = "0.2" # Benchmarks.

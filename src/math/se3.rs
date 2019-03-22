@@ -134,6 +134,8 @@ pub fn log(iso: Iso3) -> Twist {
 mod tests {
 
     use super::*;
+    use approx;
+    use quickcheck_macros;
 
     // The best precision I get for round trips with quickcheck random inputs
     // with exact trigonometric computations ("else" branches) is around 1e-4.
@@ -147,20 +149,27 @@ mod tests {
 
     // PROPERTY TESTS ################################################
 
-    quickcheck! {
-        fn hat_vee_roundtrip(v1: Float, v2: Float, v3: Float, w1: Float, w2: Float, w3: Float) -> bool {
-            let xi = Vec6::new(v1, v2, v3, w1, w2, w3);
-            xi == vee(hat(xi))
-        }
+    #[quickcheck_macros::quickcheck]
+    fn hat_vee_roundtrip(v1: Float, v2: Float, v3: Float, w1: Float, w2: Float, w3: Float) -> bool {
+        let xi = Vec6::new(v1, v2, v3, w1, w2, w3);
+        xi == vee(hat(xi))
+    }
 
-        fn log_exp_round_trip(t1: Float, t2: Float, t3: Float, a1: Float, a2: Float, a3: Float) -> bool {
-            let rigid_motion = gen_rigid_motion(t1,t2,t3,a1,a2,a3);
-            relative_eq!(
-                rigid_motion,
-                exp(log(rigid_motion)),
-                epsilon = EPSILON_ROUNDTRIP_APPROX
-            )
-        }
+    #[quickcheck_macros::quickcheck]
+    fn log_exp_round_trip(
+        t1: Float,
+        t2: Float,
+        t3: Float,
+        a1: Float,
+        a2: Float,
+        a3: Float,
+    ) -> bool {
+        let rigid_motion = gen_rigid_motion(t1, t2, t3, a1, a2, a3);
+        approx::relative_eq!(
+            rigid_motion,
+            exp(log(rigid_motion)),
+            epsilon = EPSILON_ROUNDTRIP_APPROX
+        )
     }
 
     // GENERATORS ####################################################

@@ -103,6 +103,8 @@ pub fn log(rotation: UnitQuaternion<Float>) -> Vec3 {
 mod tests {
 
     use super::*;
+    use approx;
+    use quickcheck_macros;
 
     // The best precision I get for round trips with quickcheck random inputs
     // with exact trigonometric computations ("else" branches) is around 1e-6.
@@ -116,25 +118,26 @@ mod tests {
 
     // PROPERTY TESTS ################################################
 
-    quickcheck! {
-        fn hat_vee_roundtrip(x: Float, y: Float, z: Float) -> bool {
-            let element = Vec3::new(x,y,z);
-            element == vee(hat(element))
-        }
+    #[quickcheck_macros::quickcheck]
+    fn hat_vee_roundtrip(x: Float, y: Float, z: Float) -> bool {
+        let element = Vec3::new(x, y, z);
+        element == vee(hat(element))
+    }
 
-        fn hat_2_ok(x: Float, y: Float, z: Float) -> bool {
-            let element = Vec3::new(x,y,z);
-            hat_2(element) == hat(element) * hat(element)
-        }
+    #[quickcheck_macros::quickcheck]
+    fn hat_2_ok(x: Float, y: Float, z: Float) -> bool {
+        let element = Vec3::new(x, y, z);
+        hat_2(element) == hat(element) * hat(element)
+    }
 
-        fn log_exp_round_trip(roll: Float, pitch: Float, yaw: Float) -> bool {
-            let rotation = gen_rotation(roll, pitch, yaw);
-            relative_eq!(
-                rotation,
-                exp(log(rotation)),
-                epsilon = EPSILON_ROUNDTRIP_APPROX
-            )
-        }
+    #[quickcheck_macros::quickcheck]
+    fn log_exp_round_trip(roll: Float, pitch: Float, yaw: Float) -> bool {
+        let rotation = gen_rotation(roll, pitch, yaw);
+        approx::relative_eq!(
+            rotation,
+            exp(log(rotation)),
+            epsilon = EPSILON_ROUNDTRIP_APPROX
+        )
     }
 
     // GENERATORS ####################################################
