@@ -121,7 +121,7 @@ pub mod parse {
 
     // Association line is either a comment or two timestamps and file paths.
     named!(association_line<CompleteStr, Option<Association> >,
-        alt!( map!(comment, |_| None) | map!(association, |a| Some(a)) )
+        alt!( map!(comment, |_| None) | map!(association, Some) )
     );
 
     // Parse an association of depth and color timestamps and file paths.
@@ -143,7 +143,7 @@ pub mod parse {
 
     // Trajectory line is either a comment or a frame timestamp and pose.
     named!(trajectory_line<CompleteStr, Option<Frame> >,
-        alt!( map!(comment, |_| None) | map!(frame, |f| Some(f)) )
+        alt!( map!(comment, |_| None) | map!(frame, Some) )
     );
 
     // Parse a comment.

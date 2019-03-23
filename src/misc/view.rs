@@ -41,7 +41,7 @@ fn min_max(idepth_map: &DMatrix<InverseDepth>) -> Option<(Float, Float)> {
     let mut min_temp: Option<Float> = None;
     let mut max_temp: Option<Float> = None;
     idepth_map.iter().for_each(|idepth| {
-        if let &InverseDepth::WithVariance(id, _) = idepth {
+        if let InverseDepth::WithVariance(id, _) = *idepth {
             min_temp = min_temp.map(|x| x.min(id)).or_else(|| Some(id));
             max_temp = max_temp.map(|x| x.max(id)).or_else(|| Some(id));
         }

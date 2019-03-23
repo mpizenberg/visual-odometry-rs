@@ -57,6 +57,7 @@ pub fn vee(mat: Mat3) -> Vec3 {
 
 /// Compute the exponential map from Lie algebra so3 to Lie group SO3.
 /// Goes from so3 parameterization to SO3 element (rotation).
+#[allow(clippy::useless_let_if_seq)]
 pub fn exp(w: Vec3) -> UnitQuaternion<Float> {
     let theta_2 = w.norm_squared();
     let real_factor;

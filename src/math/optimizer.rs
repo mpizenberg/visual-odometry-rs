@@ -58,7 +58,7 @@ where
         let mut state = Self::init(obs, initial_model);
         let mut nb_iter = 0;
         loop {
-            nb_iter = nb_iter + 1;
+            nb_iter += 1;
             let new_model = state.step()?;
             let eval_state = state.eval(obs, new_model);
             let (kept_state, continuation) = state.stop_criterion(nb_iter, eval_state);
