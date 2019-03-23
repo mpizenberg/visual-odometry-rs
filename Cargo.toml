@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Matthieu Pizenberg <matthieu.pizenberg@gmail.com>"]
 edition = "2018"
 
-description = "Visual odometry in Rust (vors)"
+# description = "Visual odometry in Rust (vors)"
 homepage = "https://github.com/mpizenberg/visual-odometry-rs"
 repository = "https://github.com/mpizenberg/visual-odometry-rs"
 readme = "README.md"
