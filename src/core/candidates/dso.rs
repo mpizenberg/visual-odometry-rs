@@ -122,17 +122,9 @@ pub fn select<T: Number<T>>(
     let target_size = std::cmp::max(1, target_size.round() as i32) as usize;
     // eprintln!("base_size:   {}", block_config.base_size);
     // eprintln!("target_size: {}", target_size);
-    if candidates_ratio < recursive_config.low_thresh {
-        if target_size != block_config.base_size && recursive_config.nb_iterations_left > 0 {
-            let mut b_config = block_config;
-            b_config.base_size = target_size;
-            let mut rec_config = recursive_config;
-            rec_config.nb_iterations_left -= 1;
-            return select(gradients, region_config, b_config, rec_config, nb_target);
-        } else {
-            return to_mask(picked);
-        }
-    } else if candidates_ratio > recursive_config.high_thresh {
+    if candidates_ratio < recursive_config.low_thresh
+        || candidates_ratio > recursive_config.high_thresh
+    {
         if target_size != block_config.base_size && recursive_config.nb_iterations_left > 0 {
             let mut b_config = block_config;
             b_config.base_size = target_size;
