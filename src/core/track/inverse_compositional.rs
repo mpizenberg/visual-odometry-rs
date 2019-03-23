@@ -60,6 +60,7 @@ struct State {
 }
 
 /// Mostly multi-resolution data related to the frame.
+#[allow(clippy::type_complexity)]
 struct MultiresData {
     intrinsics_multires: Levels<Intrinsics>,
     img_multires: Levels<DMatrix<u8>>,
@@ -260,13 +261,13 @@ fn extract_z(idepth_mat: &DMatrix<InverseDepth>) -> (Vec<(usize, usize)>, Vec<Fl
     let mut _z_vec = Vec::new();
     let (nb_rows, _) = idepth_mat.shape();
     for idepth in idepth_mat.iter() {
-        if let &InverseDepth::WithVariance(_z, _) = idepth {
+        if let InverseDepth::WithVariance(_z, _) = *idepth {
             coordinates.push((u, v));
             _z_vec.push(_z);
         }
-        v = v + 1;
+        v += 1;
         if v >= nb_rows {
-            u = u + 1;
+            u += 1;
             v = 0;
         }
     }
@@ -276,8 +277,8 @@ fn extract_z(idepth_mat: &DMatrix<InverseDepth>) -> (Vec<(usize, usize)>, Vec<Fl
 /// Precompute jacobians for each candidate.
 fn warp_jacobians(
     intrinsics: &Intrinsics,
-    coordinates: &Vec<(usize, usize)>,
-    _z_candidates: &Vec<Float>,
+    coordinates: &[(usize, usize)],
+    _z_candidates: &[Float],
     grad_x: &DMatrix<i16>,
     grad_y: &DMatrix<i16>,
 ) -> Vec<Vec6> {
@@ -291,14 +292,15 @@ fn warp_jacobians(
         .iter()
         .zip(_z_candidates.iter())
         .map(|(&(u, v), &_z)| {
-            let gu = grad_x[(v, u)] as Float;
-            let gv = grad_y[(v, u)] as Float;
+            let gu = Float::from(grad_x[(v, u)]);
+            let gv = Float::from(grad_y[(v, u)]);
             warp_jacobian_at(gu, gv, u as Float, v as Float, _z, cu, cv, fu, fv, s)
         })
         .collect()
 }
 
 /// Jacobian of the warping function for the inverse compositional algorithm.
+#[allow(clippy::too_many_arguments)]
 fn warp_jacobian_at(
     gu: Float,
     gv: Float,
@@ -330,6 +332,7 @@ fn warp_jacobian_at(
 }
 
 /// Compute hessians components for each candidate point.
+#[allow(clippy::ptr_arg)] // TODO: Applying clippy lint here results in compilation error.
 fn hessians_vec(jacobians: &Vec<Vec6>) -> Vec<Mat6> {
     // TODO: might be better to inline this within the function computing the jacobians.
     jacobians.iter().map(|j| j * j.transpose()).collect()

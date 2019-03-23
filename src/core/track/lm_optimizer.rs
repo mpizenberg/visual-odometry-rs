@@ -74,8 +74,8 @@ impl LMOptimizerState {
             if let Some(im) = interpolate(u, v, &obs.image) {
                 // precompute residuals and energy
                 let tmp = obs.template[(y, x)];
-                let r = im - tmp as Float;
-                energy_sum = energy_sum + r * r;
+                let r = im - Float::from(tmp);
+                energy_sum += r * r;
                 residuals.push(r);
                 inside_indices.push(idx); // keep only inside points
             }
@@ -93,8 +93,8 @@ impl LMOptimizerState {
             let jac = obs.jacobians[idx];
             let hes = obs.hessians[idx];
             let r = residuals[i];
-            gradient = gradient + jac * r;
-            hessian = hessian + hes;
+            gradient += jac * r;
+            hessian += hes;
         }
         EvalData {
             hessian,
@@ -119,13 +119,13 @@ impl<'a> OptimizerState<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState {
     /// Apply the step in an inverse compositional approach to compute the next motion estimation.
     /// May return an error at the Cholesky decomposition of the hessian.
     fn step(&self) -> Result<Iso3, String> {
-        let mut hessian = self.eval_data.hessian.clone();
-        hessian.m11 = (1.0 + self.lm_coef) * hessian.m11;
-        hessian.m22 = (1.0 + self.lm_coef) * hessian.m22;
-        hessian.m33 = (1.0 + self.lm_coef) * hessian.m33;
-        hessian.m44 = (1.0 + self.lm_coef) * hessian.m44;
-        hessian.m55 = (1.0 + self.lm_coef) * hessian.m55;
-        hessian.m66 = (1.0 + self.lm_coef) * hessian.m66;
+        let mut hessian = self.eval_data.hessian;
+        hessian.m11 *= 1.0 + self.lm_coef;
+        hessian.m22 *= 1.0 + self.lm_coef;
+        hessian.m33 *= 1.0 + self.lm_coef;
+        hessian.m44 *= 1.0 + self.lm_coef;
+        hessian.m55 *= 1.0 + self.lm_coef;
+        hessian.m66 *= 1.0 + self.lm_coef;
         let cholesky = hessian
             .cholesky()
             .ok_or("Error at Cholesky decomposition of hessian")?;
@@ -168,7 +168,7 @@ impl<'a> OptimizerState<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState {
             (Err(_energy), false) => {
                 // eprintln!("\t back from: {}", energy);
                 let mut kept_state = self;
-                kept_state.lm_coef = 10.0 * kept_state.lm_coef;
+                kept_state.lm_coef *= 10.0;
                 (kept_state, Continue::Forward)
             }
             (Ok(eval_data), false) => {
@@ -226,10 +226,10 @@ fn interpolate(x: Float, y: Float, image: &DMatrix<u8>) -> Option<Float> {
         let v_0 = v as usize;
         let u_1 = u_0 + 1;
         let v_1 = v_0 + 1;
-        let vu_00 = image[(v_0, u_0)] as Float;
-        let vu_10 = image[(v_1, u_0)] as Float;
-        let vu_01 = image[(v_0, u_1)] as Float;
-        let vu_11 = image[(v_1, u_1)] as Float;
+        let vu_00 = Float::from(image[(v_0, u_0)]);
+        let vu_10 = Float::from(image[(v_1, u_0)]);
+        let vu_01 = Float::from(image[(v_0, u_1)]);
+        let vu_11 = Float::from(image[(v_1, u_1)]);
         let a = x - u;
         let b = y - v;
         Some(

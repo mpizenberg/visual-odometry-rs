@@ -24,8 +24,8 @@ pub fn centered(img: &na::DMatrix<u8>) -> (na::DMatrix<i16>, na::DMatrix<i16>) {
     let mut grad_y_inner = grad_y.slice_mut((1, 1), (nb_rows - 2, nb_cols - 2));
     for j in 0..nb_cols - 2 {
         for i in 0..nb_rows - 2 {
-            grad_x_inner[(i, j)] = (right[(i, j)] as i16 - left[(i, j)] as i16) / 2;
-            grad_y_inner[(i, j)] = (bottom[(i, j)] as i16 - top[(i, j)] as i16) / 2;
+            grad_x_inner[(i, j)] = (i16::from(right[(i, j)]) - i16::from(left[(i, j)])) / 2;
+            grad_y_inner[(i, j)] = (i16::from(bottom[(i, j)]) - i16::from(top[(i, j)])) / 2;
         }
     }
     (grad_x, grad_y)
@@ -34,8 +34,8 @@ pub fn centered(img: &na::DMatrix<u8>) -> (na::DMatrix<i16>, na::DMatrix<i16>) {
 /// Compute squared gradient norm from x and y gradient matrices.
 pub fn squared_norm(grad_x: &na::DMatrix<i16>, grad_y: &na::DMatrix<i16>) -> na::DMatrix<u16> {
     grad_x.zip_map(grad_y, |gx, gy| {
-        let gx = gx as i32;
-        let gy = gy as i32;
+        let gx = i32::from(gx);
+        let gy = i32::from(gy);
         (gx * gx + gy * gy) as u16
     })
 }
@@ -51,8 +51,8 @@ pub fn squared_norm_direct(im: &na::DMatrix<u8>) -> na::DMatrix<u16> {
     let mut grad_inner = squared_norm_mat.slice_mut((1, 1), (nb_rows - 2, nb_cols - 2));
     for j in 0..nb_cols - 2 {
         for i in 0..nb_rows - 2 {
-            let gx = right[(i, j)] as i32 - left[(i, j)] as i32;
-            let gy = bottom[(i, j)] as i32 - top[(i, j)] as i32;
+            let gx = i32::from(right[(i, j)]) - i32::from(left[(i, j)]);
+            let gy = i32::from(bottom[(i, j)]) - i32::from(top[(i, j)]);
             grad_inner[(i, j)] = ((gx * gx + gy * gy) / 4) as u16;
         }
     }
@@ -67,10 +67,10 @@ pub fn squared_norm_direct(im: &na::DMatrix<u8>) -> na::DMatrix<u16> {
 ///   a c
 ///   b d
 pub fn bloc_x(a: u8, b: u8, c: u8, d: u8) -> i16 {
-    let a = a as i16;
-    let b = b as i16;
-    let c = c as i16;
-    let d = d as i16;
+    let a = i16::from(a);
+    let b = i16::from(b);
+    let c = i16::from(c);
+    let d = i16::from(d);
     (c + d - a - b) / 2
 }
 
@@ -80,10 +80,10 @@ pub fn bloc_x(a: u8, b: u8, c: u8, d: u8) -> i16 {
 ///   a c
 ///   b d
 pub fn bloc_y(a: u8, b: u8, c: u8, d: u8) -> i16 {
-    let a = a as i16;
-    let b = b as i16;
-    let c = c as i16;
-    let d = d as i16;
+    let a = i16::from(a);
+    let b = i16::from(b);
+    let c = i16::from(c);
+    let d = i16::from(d);
     (b - a + d - c) / 2
 }
 
@@ -93,10 +93,10 @@ pub fn bloc_y(a: u8, b: u8, c: u8, d: u8) -> i16 {
 ///   a c
 ///   b d
 pub fn bloc_squared_norm(a: u8, b: u8, c: u8, d: u8) -> u16 {
-    let a = a as i32;
-    let b = b as i32;
-    let c = c as i32;
-    let d = d as i32;
+    let a = i32::from(a);
+    let b = i32::from(b);
+    let c = i32::from(c);
+    let d = i32::from(d);
     let dx = c + d - a - b;
     let dy = b - a + d - c;
     // I have checked that the max value is in u16.

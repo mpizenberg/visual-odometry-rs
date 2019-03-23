@@ -26,7 +26,7 @@ pub enum InverseDepth {
 pub fn from_depth(scale: Float, depth: u16, variance: Float) -> InverseDepth {
     match depth {
         0 => InverseDepth::Unknown,
-        _ => InverseDepth::WithVariance(scale / depth as Float, variance),
+        _ => InverseDepth::WithVariance(scale / Float::from(depth), variance),
     }
 }
 
@@ -64,7 +64,7 @@ where
 }
 
 fn with_variance(idepth: &InverseDepth) -> Option<(Float, Float)> {
-    if let &InverseDepth::WithVariance(idepth, var) = idepth {
+    if let InverseDepth::WithVariance(idepth, var) = *idepth {
         Some((idepth, var))
     } else {
         None

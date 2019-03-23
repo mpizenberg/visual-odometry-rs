@@ -20,10 +20,10 @@ use crate::core::gradient;
 pub fn mean_pyramid(max_levels: usize, mat: DMatrix<u8>) -> Vec<DMatrix<u8>> {
     limited_sequence(max_levels, mat, |m| {
         halve(m, |a, b, c, d| {
-            let a = a as u16;
-            let b = b as u16;
-            let c = c as u16;
-            let d = d as u16;
+            let a = u16::from(a);
+            let b = u16::from(b);
+            let c = u16::from(c);
+            let d = u16::from(d);
             ((a + b + c + d) / 4) as u8
         })
     })
@@ -38,7 +38,7 @@ pub fn limited_sequence<F: Fn(&T) -> Option<T>, T>(max_length: usize, data: T, f
     let mut length = 1;
     let f_limited = |x: &T| {
         if length < max_length {
-            length = length + 1;
+            length += 1;
             f(x)
         } else {
             None
@@ -91,7 +91,7 @@ where
 /// the image at the higher resolution.
 ///
 /// As a consequence there is one less level in the gradients pyramid.
-pub fn gradients_squared_norm(multires_mat: &Vec<DMatrix<u8>>) -> Vec<DMatrix<u16>> {
+pub fn gradients_squared_norm(multires_mat: &[DMatrix<u8>]) -> Vec<DMatrix<u16>> {
     let nb_levels = multires_mat.len();
     multires_mat
         .iter()
@@ -107,7 +107,7 @@ pub fn gradients_squared_norm(multires_mat: &Vec<DMatrix<u8>>) -> Vec<DMatrix<u1
 /// the image at the higher resolution.
 ///
 /// As a consequence there is one less level in the gradients pyramid.
-pub fn gradients_xy(multires_mat: &Vec<DMatrix<u8>>) -> Vec<(DMatrix<i16>, DMatrix<i16>)> {
+pub fn gradients_xy(multires_mat: &[DMatrix<u8>]) -> Vec<(DMatrix<i16>, DMatrix<i16>)> {
     // TODO: maybe it would be better to return Vec<DMatrix<(i16,i16)>>,
     // to colocate the x and y gradient and do only one "halve" call?
     let nb_levels = multires_mat.len();
