@@ -33,5 +33,5 @@ criterion = "0.2" # Benchmarks.
 
 
 [[bench]]
-name = "png_read"
+name = "mean_pyramid"
 harness = false
