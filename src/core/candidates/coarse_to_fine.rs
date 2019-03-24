@@ -12,7 +12,7 @@ use nalgebra::{DMatrix, Scalar};
 ///
 /// Each level is kept but important one
 /// is the one at the highest resolution (the last one).
-pub fn select<T>(diff_threshold: T, gradients: &Vec<DMatrix<T>>) -> Vec<DMatrix<bool>>
+pub fn select<T>(diff_threshold: T, gradients: &[DMatrix<T>]) -> Vec<DMatrix<bool>>
 where
     T: Scalar + std::cmp::PartialOrd + std::ops::Add<Output = T>,
 {

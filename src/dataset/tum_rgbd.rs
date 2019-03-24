@@ -10,7 +10,6 @@ use std::path::PathBuf;
 use crate::core::camera::Intrinsics;
 use crate::misc::type_aliases::{Float, Iso3};
 
-
 /// U16 depth values are scaled for better precision.
 /// So 5000 in the 16 bits gray png corresponds to 1 meter.
 pub const DEPTH_SCALE: Float = 5000.0;
@@ -30,24 +29,24 @@ pub const INTRINSICS_ICL_NUIM: Intrinsics = Intrinsics {
 /// Intrinsics parameters of freiburg 1 (fr1) scenes in the TUM RGB-D dataset.
 #[allow(clippy::excessive_precision)]
 pub const INTRINSICS_FR1: Intrinsics = Intrinsics {
-    principal_point: (318.643040, 255.313989),
-    focal: (517.306408, 516.469215),
+    principal_point: (318.643_040, 255.313_989),
+    focal: (517.306_408, 516.469_215),
     skew: 0.0,
 };
 
 /// Intrinsics parameters of freiburg 2 (fr2) scenes in the TUM RGB-D dataset.
 #[allow(clippy::excessive_precision)]
 pub const INTRINSICS_FR2: Intrinsics = Intrinsics {
-    principal_point: (325.141442, 249.701764),
-    focal: (520.908620, 521.007327),
+    principal_point: (325.141_442, 249.701_764),
+    focal: (520.908_620, 521.007_327),
     skew: 0.0,
 };
 
 /// Intrinsics parameters of freiburg 3 (fr3) scenes in the TUM RGB-D dataset.
 #[allow(clippy::excessive_precision)]
 pub const INTRINSICS_FR3: Intrinsics = Intrinsics {
-    principal_point: (320.106653, 247.632132),
-    focal: (535.433105, 539.212524),
+    principal_point: (320.106_653, 247.632_132),
+    focal: (535.433_105, 539.212_524),
     skew: 0.0,
 };
 

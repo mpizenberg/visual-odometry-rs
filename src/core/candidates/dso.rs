@@ -130,9 +130,9 @@ pub fn select<T: Number<T>>(
             b_config.base_size = target_size;
             let mut rec_config = recursive_config;
             rec_config.nb_iterations_left -= 1;
-            return select(gradients, region_config, b_config, rec_config, nb_target);
+            select(gradients, region_config, b_config, rec_config, nb_target)
         } else {
-            return to_mask(picked);
+            to_mask(picked)
         }
     } else if candidates_ratio > recursive_config.random_thresh {
         // randomly select a correct % of points
@@ -161,28 +161,26 @@ fn pick_all_block_candidates<T: Number<T>>(
         multires::limited_sequence(block_config.nb_levels, max_gradients_0, |m| {
             multires::halve(m, max_of_four_gradients)
         });
-    let mut block_size = block_config.base_size;
     let mut threshold_level_coef = 1.0;
     let mut nb_picked = Vec::new();
     let (blocks_rows, blocks_cols) = max_gradients_multires[0].shape();
     let mut mask = DMatrix::repeat(blocks_rows, blocks_cols, true);
     let mut candidates = DMatrix::repeat(nb_rows, nb_cols, 0u8);
-    for level in 0..block_config.nb_levels {
+    for (level, max_gradients_level) in max_gradients_multires.iter().enumerate() {
         // call pick_level_block_candidates()
         let (nb_picked_level, mask_next_level, new_candidates) = pick_level_block_candidates(
             threshold_level_coef,
             (level + 1) as u8,
             regions_size,
             regions_thresholds,
-            &max_gradients_multires[level],
+            max_gradients_level,
             &mask,
             candidates,
         );
         nb_picked.push(nb_picked_level);
         mask = mask_next_level;
         candidates = new_candidates;
-        block_size = 2 * block_size;
-        threshold_level_coef = block_config.threshold_factor * threshold_level_coef;
+        threshold_level_coef *= block_config.threshold_factor;
     }
     (nb_picked, candidates)
 }
@@ -257,7 +255,7 @@ fn pick_level_block_candidates<T: Number<T>>(
     // We use mask_width / 2 * 2 to avoid remainder pixels
     for j in 0..(mask_width / 2 * 2) {
         for i in 0..(mask_height / 2 * 2) {
-            if mask[(i, j)] == false {
+            if !mask[(i, j)] {
                 mask_next_level[(i / 2, j / 2)] = false;
             } else {
                 let (g2, i_g, j_g) = max_gradients[(i, j)];
