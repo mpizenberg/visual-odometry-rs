@@ -62,6 +62,7 @@ pub fn sequence<F: FnMut(&T) -> Option<T>, T>(data: T, mut f: F) -> Vec<T> {
 ///
 /// If one size of the matrix is < 2 then this function returns None.
 /// If one size is odd, its last line/column is dropped.
+#[allow(clippy::many_single_char_names)]
 pub fn halve<F, T, U>(mat: &DMatrix<T>, f: F) -> Option<DMatrix<U>>
 where
     F: Fn(T, T, T, T) -> U,

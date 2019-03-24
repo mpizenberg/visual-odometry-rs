@@ -217,6 +217,7 @@ fn warp(model: &Iso3, x: Float, y: Float, _z: Float, intrinsics: &Intrinsics) ->
 
 /// Simple linear interpolation of a pixel with floating point coordinates.
 /// Return `None` if the point is outside of the image boundaries.
+#[allow(clippy::many_single_char_names)]
 fn interpolate(x: Float, y: Float, image: &DMatrix<u8>) -> Option<Float> {
     let (height, width) = image.shape();
     let u = x.floor();

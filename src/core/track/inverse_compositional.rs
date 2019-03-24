@@ -301,6 +301,7 @@ fn warp_jacobians(
 
 /// Jacobian of the warping function for the inverse compositional algorithm.
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::many_single_char_names)]
 fn warp_jacobian_at(
     gu: Float,
     gv: Float,

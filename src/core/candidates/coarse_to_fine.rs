@@ -33,6 +33,7 @@ where
 
 /// Apply a predicate function on each 2x2 bloc.
 /// Only evaluate the function in selected blocs in the half resolution pre_mask.
+#[allow(clippy::many_single_char_names)]
 fn select_2x2_bloc<T, F>(pre_mask: &DMatrix<bool>, mat: &DMatrix<T>, f: F) -> DMatrix<bool>
 where
     T: Scalar,
@@ -68,6 +69,7 @@ where
 ///     ( 0, 1, 8, 9 ) -> [ false, false, true, true ]
 ///     ( 0, 9, 1, 8 ) -> [ false, true, false, true ]
 ///     ( 1, 0, 9, 0 ) -> [ false, false, true, false ]
+#[allow(clippy::many_single_char_names)]
 fn prune_with_thresh<T>(thresh: T, a: T, b: T, c: T, d: T) -> [bool; 4]
 where
     T: Scalar + std::cmp::PartialOrd + std::ops::Add<Output = T>,

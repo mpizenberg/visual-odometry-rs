@@ -92,8 +92,8 @@ pub struct Intrinsics {
 
 impl Intrinsics {
     /// Equivalent matrix representation of intrinsic parameters.
+    #[rustfmt::skip]
     pub fn matrix(&self) -> Affine2<Float> {
-        #[cfg_attr(rustfmt, rustfmt_skip)]
         Affine2::from_matrix_unchecked(Mat3::new(
             self.focal.0, self.skew,    self.principal_point.0,
             0.0,          self.focal.1, self.principal_point.1,

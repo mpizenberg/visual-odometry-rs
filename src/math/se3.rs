@@ -41,11 +41,11 @@ pub fn angular_velocity(xi: Twist) -> Vec3 {
 
 /// Hat operator.
 /// Goes from se3 parameters to se3 element (4x4 matrix).
+#[rustfmt::skip]
 pub fn hat(xi: Twist) -> Mat4 {
     let w1 = xi[3];
     let w2 = xi[4];
     let w3 = xi[5];
-    #[cfg_attr(rustfmt, rustfmt_skip)]
     Mat4::new(
          0.0,  -w3,    w2,   xi[0],
          w3,    0.0,  -w1,   xi[1],

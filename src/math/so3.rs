@@ -23,8 +23,8 @@ const _1_48: Float = 1.0 / 48.0;
 
 /// Hat operator.
 /// Goes from so3 parameterization to so3 element (skew-symmetric matrix).
+#[rustfmt::skip]
 pub fn hat(w: Vec3) -> Mat3 {
-    #[cfg_attr(rustfmt, rustfmt_skip)]
     Mat3::new(
          0.0,  -w.z,   w.y,
          w.z,   0.0,  -w.x,
@@ -34,6 +34,7 @@ pub fn hat(w: Vec3) -> Mat3 {
 
 /// Squared hat operator (`hat_2(w) == hat(w) * hat(w)`).
 /// Result is a symmetric matrix.
+#[rustfmt::skip]
 pub fn hat_2(w: Vec3) -> Mat3 {
     let w11 = w.x * w.x;
     let w12 = w.x * w.y;
@@ -41,7 +42,6 @@ pub fn hat_2(w: Vec3) -> Mat3 {
     let w22 = w.y * w.y;
     let w23 = w.y * w.z;
     let w33 = w.z * w.z;
-    #[cfg_attr(rustfmt, rustfmt_skip)]
     Mat3::new(
         -w22 - w33,     w12,           w13,
          w12,          -w11 - w33,     w23,
