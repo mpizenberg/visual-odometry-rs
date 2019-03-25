@@ -98,3 +98,24 @@ including:
 This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+## Contributions
+
+All forms of contribution are welcomed, **preferably first as github issues**.
+
+- Questions
+- Documentation
+- Tests
+- Benchmarks
+- Features
+
+In case of contribution to source code,
+it needs to use [rustfmt][rustfmt] and [clippy][clippy].
+To run clippy:
+
+```
+touch src/lib.rs; cargo clippy --release --all-targets --all-features
+```
+
+[rustfmt]: https://github.com/rust-lang/rustfmt
+[clippy]: https://github.com/rust-lang/rust-clippy
