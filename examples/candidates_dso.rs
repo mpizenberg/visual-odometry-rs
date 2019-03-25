@@ -39,7 +39,7 @@ fn run(args: Vec<String>) -> Result<(), Box<Error>> {
 
 fn generate_candidates(img: &Img) -> na::DMatrix<bool> {
     // Compute gradients norm of the image.
-    let gradients = gradient::squared_norm_direct(img).map(|g2| (g2 as f32).sqrt() as u16);
+    let gradients = gradient::squared_norm_direct(img).map(|g2| f32::from(g2).sqrt() as u16);
 
     // Example of how to adapt default parameters config.
     let mut recursive_config = candidates::DEFAULT_RECURSIVE_CONFIG;

@@ -56,21 +56,23 @@ fn min_max(idepth_map: &DMatrix<InverseDepth>) -> Option<(Float, Float)> {
 // INVERSE DEPTH HELPERS #############################################
 
 /// Visualize the enum as an 8-bits intensity:
-/// - Unknown:      black
-/// - Discarded:    gray
-/// - WithVariance: white
+/// - `Unknown`:      black
+/// - `Discarded`:    gray
+/// - `WithVariance`: white
 pub fn idepth_enum(idepth: &InverseDepth) -> u8 {
     match idepth {
-        InverseDepth::Unknown => 0u8,
-        InverseDepth::Discarded => 50u8,
-        InverseDepth::WithVariance(_, _) => 255u8,
+        InverseDepth::Unknown => 0_u8,
+        InverseDepth::Discarded => 50_u8,
+        InverseDepth::WithVariance(_, _) => 255_u8,
     }
 }
 
 /// Visualize the enum with color depending on inverse depth:
-/// - Unknown:      black
-/// - Discarded:    red
-/// - WithVariance: viridis colormap
+/// - `Unknown`:      black
+/// - `Discarded`:    red
+/// - `WithVariance`: viridis colormap
+#[allow(clippy::cast_sign_loss)]
+#[allow(clippy::cast_possible_truncation)]
 pub fn idepth_enum_colormap(
     colormap: &[(u8, u8, u8)],
     d_min: Float,

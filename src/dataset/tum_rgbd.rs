@@ -94,16 +94,16 @@ pub mod parse {
     };
 
     /// Parse an association file into a vector of `Association`.
-    pub fn associations(file_content: String) -> Result<Vec<Association>, String> {
+    pub fn associations(file_content: &str) -> Result<Vec<Association>, String> {
         multi_line(association_line, file_content)
     }
 
     /// Parse a trajectory file into a vector of `Frame`.
-    pub fn trajectory(file_content: String) -> Result<Vec<Frame>, String> {
+    pub fn trajectory(file_content: &str) -> Result<Vec<Frame>, String> {
         multi_line(trajectory_line, file_content)
     }
 
-    fn multi_line<F, T>(line_parser: F, file_content: String) -> Result<Vec<T>, String>
+    fn multi_line<F, T>(line_parser: F, file_content: &str) -> Result<Vec<T>, String>
     where
         F: Fn(CompleteStr) -> nom::IResult<CompleteStr, Option<T>>,
     {

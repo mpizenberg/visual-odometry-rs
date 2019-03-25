@@ -24,8 +24,8 @@ pub struct Camera {
 
 impl Camera {
     /// Initialize a camera from intrinsic and extrinsic parameters.
-    pub fn new(intrinsics: Intrinsics, extrinsics: Extrinsics) -> Camera {
-        Camera {
+    pub fn new(intrinsics: Intrinsics, extrinsics: Extrinsics) -> Self {
+        Self {
             intrinsics,
             extrinsics,
         }
@@ -46,13 +46,13 @@ impl Camera {
 
     /// Generate a multi-resolution camera.
     /// Extrinsics are left intact, but intrinsics are scaled at each level.
-    pub fn multi_res(self, n: usize) -> Vec<Camera> {
+    pub fn multi_res(self, n: usize) -> Vec<Self> {
         multires::limited_sequence(n, self, |cam| Some(cam.half_res()))
     }
 
     /// Generate a camera corresponding to an image with half resolution.
     /// Extrinsics are left intact, but intrinsics are scaled.
-    pub fn half_res(&self) -> Camera {
+    pub fn half_res(&self) -> Self {
         Self::new(self.intrinsics.half_res(), self.extrinsics)
     }
 }
@@ -103,7 +103,7 @@ impl Intrinsics {
 
     /// Generate a multi-resolution vector of intrinsic parameters.
     /// Each level corresponds to a camera with half resolution.
-    pub fn multi_res(self, n: usize) -> Vec<Intrinsics> {
+    pub fn multi_res(self, n: usize) -> Vec<Self> {
         multires::limited_sequence(n, self, |intrinsics| Some(intrinsics.half_res()))
     }
 
@@ -112,10 +112,10 @@ impl Intrinsics {
     /// Since the (0,0) coordinates correspond the center of the first pixel,
     /// and not its top left corner, a shift of 0.5 is performed
     /// for the principal point before and after the resolution scaling.
-    pub fn half_res(&self) -> Intrinsics {
+    pub fn half_res(&self) -> Self {
         let (cx, cy) = self.principal_point;
         let (fx, fy) = self.focal;
-        Intrinsics {
+        Self {
             principal_point: ((cx + 0.5) / 2.0 - 0.5, (cy + 0.5) / 2.0 - 0.5),
             focal: (0.5 * fx, 0.5 * fy),
             skew: self.skew,

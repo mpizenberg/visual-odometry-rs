@@ -5,10 +5,10 @@
 //! Lie algebra/group functions for 3D rotations.
 //!
 //! Interesting reads:
-//! - Sophus c++ library: https://github.com/strasdat/Sophus
+//! - Sophus c++ library: <https://github.com/strasdat/Sophus>
 //! - Ethan Eade course on Lie Groups for 2D and 3D transformations:
-//!     - details: http://ethaneade.com/lie.pdf
-//!     - summary: http://ethaneade.com/lie_groups.pdf
+//!     - details: <http://ethaneade.com/lie.pdf>
+//!     - summary: <http://ethaneade.com/lie_groups.pdf>
 
 use nalgebra::{Quaternion, UnitQuaternion};
 use std::f32::consts::PI;

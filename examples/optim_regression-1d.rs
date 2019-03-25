@@ -9,7 +9,7 @@ extern crate visual_odometry_rs as vors;
 use na::DVector;
 use rand::{distributions::Uniform, rngs::StdRng, SeedableRng};
 use std::{f32, process::exit};
-use vors::math::optimizer::{Continue, OptimizerState};
+use vors::math::optimizer::{self, Continue, State as _};
 
 /// In this example, we implement the `OptimizerState` trait to find the correct parameter `a`
 /// for modelling a noisy curve of the form: y = exp( -a * x ).
@@ -54,8 +54,8 @@ fn run() -> Result<(), String> {
     let x_domain = linspace(-5.0, 3.0, nb_data);
     let seed = [0; 32];
     let mut rng: StdRng = SeedableRng::from_seed(seed);
-    let mut distribution = Uniform::from(-1.0..1.0);
-    let noise = DVec::from_distribution(nb_data, &mut distribution, &mut rng);
+    let distribution = Uniform::from(-1.0..1.0);
+    let noise = DVec::from_distribution(nb_data, &distribution, &mut rng);
     let y_data_noisy = f(a_ground_truth, &x_domain) + 0.1 * noise;
     let noisy_observations = Obs {
         x: x_domain,
@@ -135,7 +135,7 @@ impl LMOptimizerState {
     }
 }
 
-impl OptimizerState<Obs, EvalState, f32, String> for LMOptimizerState {
+impl optimizer::State<Obs, EvalState, f32, String> for LMOptimizerState {
     /// Initialize the optimizer state.
     /// Levenberg-Marquardt coefficient start at 0.1.
     fn init(obs: &Obs, model: f32) -> Self {
@@ -178,7 +178,7 @@ impl OptimizerState<Obs, EvalState, f32, String> for LMOptimizerState {
             // Can continue to iterate:
             (Err(model), false) => {
                 let mut kept_state = self;
-                kept_state.lm_coef = 10.0 * kept_state.lm_coef;
+                kept_state.lm_coef *= 10.0;
                 println!("\t back from {}, lm_coef = {}", model, kept_state.lm_coef);
                 (kept_state, Continue::Forward)
             }
@@ -186,7 +186,7 @@ impl OptimizerState<Obs, EvalState, f32, String> for LMOptimizerState {
                 println!("a = {}, energy = {}", eval_data.model, eval_data.energy);
                 let delta_energy = self.eval_data.energy - eval_data.energy;
                 let mut kept_state = self;
-                kept_state.lm_coef = 0.1 * kept_state.lm_coef;
+                kept_state.lm_coef *= 0.1;
                 kept_state.eval_data = eval_data;
                 let continuation = if delta_energy > 0.01 {
                     Continue::Forward

@@ -25,14 +25,14 @@ where
         .rev() // start with lower res
         .skip(1) // skip lower since all points are good
         .fold(init_candidates, |mut multires_masks, grad_mat| {
-            let new_mask = select_2x2_bloc(&multires_masks.last().unwrap(), &grad_mat, prune);
+            let new_mask = select_2x2_bloc(multires_masks.last().unwrap(), grad_mat, prune);
             multires_masks.push(new_mask);
             multires_masks
         })
 }
 
 /// Apply a predicate function on each 2x2 bloc.
-/// Only evaluate the function in selected blocs in the half resolution pre_mask.
+/// Only evaluate the function in selected blocs in the half resolution `pre_mask`.
 #[allow(clippy::many_single_char_names)]
 fn select_2x2_bloc<T, F>(pre_mask: &DMatrix<bool>, mat: &DMatrix<T>, f: F) -> DMatrix<bool>
 where
@@ -75,7 +75,7 @@ where
     T: Scalar + std::cmp::PartialOrd + std::ops::Add<Output = T>,
 {
     // let thresh = 7.0 / 255.0;
-    let mut temp = [(a, 0usize), (b, 1usize), (c, 2usize), (d, 3usize)];
+    let mut temp = [(a, 0_usize), (b, 1_usize), (c, 2_usize), (d, 3_usize)];
     temp.sort_unstable_by(|(x, _), (y, _)| x.partial_cmp(y).unwrap());
     let (_, first) = temp[3];
     let (x, second) = temp[2];

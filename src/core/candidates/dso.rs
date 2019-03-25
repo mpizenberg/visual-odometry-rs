@@ -92,6 +92,9 @@ pub const DEFAULT_RECURSIVE_CONFIG: RecursiveConfig = RecursiveConfig {
 /// Select a subset of points satisfying two conditions:
 ///   * points shall be well-distributed in the image.
 ///   * higher density where gradients are bigger.
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_sign_loss)]
+#[allow(clippy::cast_precision_loss)]
 pub fn select<T: Number<T>>(
     gradients: &DMatrix<T>,
     region_config: RegionConfig<T>,
@@ -132,23 +135,24 @@ pub fn select<T: Number<T>>(
             rec_config.nb_iterations_left -= 1;
             select(gradients, region_config, b_config, rec_config, nb_target)
         } else {
-            to_mask(picked)
+            to_mask(&picked)
         }
     } else if candidates_ratio > recursive_config.random_thresh {
         // randomly select a correct % of points
         let mut rng = rand::thread_rng();
         picked.map(|p| p > 0 && rng.gen::<u8>() <= (255.0 / candidates_ratio) as u8)
     } else {
-        to_mask(picked)
+        to_mask(&picked)
     }
 }
 
 /// Create a mask of picked points.
-fn to_mask(picked: DMatrix<u8>) -> DMatrix<bool> {
+fn to_mask(picked: &DMatrix<u8>) -> DMatrix<bool> {
     picked.map(|p| p > 0)
 }
 
 /// Pick candidates at all the block levels.
+#[allow(clippy::cast_possible_truncation)]
 fn pick_all_block_candidates<T: Number<T>>(
     block_config: BlockConfig,
     regions_size: usize,
@@ -165,7 +169,7 @@ fn pick_all_block_candidates<T: Number<T>>(
     let mut nb_picked = Vec::new();
     let (blocks_rows, blocks_cols) = max_gradients_multires[0].shape();
     let mut mask = DMatrix::repeat(blocks_rows, blocks_cols, true);
-    let mut candidates = DMatrix::repeat(nb_rows, nb_cols, 0u8);
+    let mut candidates = DMatrix::repeat(nb_rows, nb_cols, 0);
     for (level, max_gradients_level) in max_gradients_multires.iter().enumerate() {
         // call pick_level_block_candidates()
         let (nb_picked_level, mask_next_level, new_candidates) = pick_level_block_candidates(
@@ -255,9 +259,7 @@ fn pick_level_block_candidates<T: Number<T>>(
     // We use mask_width / 2 * 2 to avoid remainder pixels
     for j in 0..(mask_width / 2 * 2) {
         for i in 0..(mask_height / 2 * 2) {
-            if !mask[(i, j)] {
-                mask_next_level[(i / 2, j / 2)] = false;
-            } else {
+            if mask[(i, j)] {
                 let (g2, i_g, j_g) = max_gradients[(i, j)];
                 let threshold = regions_thresholds[(i_g / regions_size, j_g / regions_size)];
                 if g2.as_() >= threshold_level_coef * threshold.as_() {
@@ -265,6 +267,8 @@ fn pick_level_block_candidates<T: Number<T>>(
                     candidates[(i_g, j_g)] = level;
                     nb_picked += 1;
                 }
+            } else {
+                mask_next_level[(i / 2, j / 2)] = false;
             }
         }
     }
@@ -273,6 +277,10 @@ fn pick_level_block_candidates<T: Number<T>>(
 
 /// Smooth the medians and set thresholds given some coefficients (a,b):
 /// threshold = a * ( smooth( median ) + b ) ^ 2.
+#[allow(clippy::cast_precision_loss)]
+#[allow(clippy::cast_possible_wrap)]
+#[allow(clippy::cast_sign_loss)]
+#[allow(clippy::cast_possible_truncation)]
 fn region_thresholds<T: Number<T>>(median_gradients: &DMatrix<T>, coefs: (Float, T)) -> DMatrix<T> {
     let (nb_rows, nb_cols) = median_gradients.shape();
     DMatrix::from_fn(nb_rows, nb_cols, |i, j| {

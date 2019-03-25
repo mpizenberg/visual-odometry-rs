@@ -5,7 +5,7 @@
 //! Guiding traits to implement iterative optimization algorithms.
 
 /// Enum used to indicate if iterations should continue or stop.
-/// Must be returned by the stop_criterion function.
+/// Must be returned by the `stop_criterion` function.
 pub enum Continue {
     /// Stop iterations.
     Stop,
@@ -13,7 +13,7 @@ pub enum Continue {
     Forward,
 }
 
-/// An `OptimizerState<Observations, EvalState, Model, Error>`
+/// An `State<Observations, EvalState, Model, Error>`
 /// is capable of iteratively minimizing an energy function,
 /// if provided few functions that are evaluated during iterations.
 ///
@@ -29,7 +29,7 @@ pub enum Continue {
 ///   or an error meaning that we stopped the evaluation because the energy increased.
 /// * `Model`: The model of what you are trying to optimize.
 /// * `Error`: Custom error type for potential failures in step computation.
-pub trait OptimizerState<Observations, EvalState, Model, Error>
+pub trait State<Observations, EvalState, Model, Error>
 where
     Self: std::marker::Sized,
 {

@@ -9,7 +9,7 @@ extern crate visual_odometry_rs as vors;
 // use rand::{rngs::StdRng, Rng, SeedableRng};
 use rand::Rng;
 use std::{env, error::Error, f32::consts, path::Path, path::PathBuf, process::exit};
-use vors::math::optimizer::{Continue, OptimizerState};
+use vors::math::optimizer::{self, Continue, State as _};
 use vors::misc::type_aliases::{Mat3, Mat6, Vec3, Vec6};
 use vors::{core::gradient, core::multires, misc::interop};
 
@@ -60,8 +60,8 @@ fn run(args: Vec<String>) -> Result<(), Box<Error>> {
     let mut model = Vec6::zeros();
     for level in (0..nb_levels).rev() {
         println!("---------------- Level {}:", level);
-        model[4] = 2.0 * model[4];
-        model[5] = 2.0 * model[5];
+        model[4] *= 2.0;
+        model[5] *= 2.0;
         let obs = Obs {
             template: &template_multires[level],
             image: &img_multires[level],
@@ -106,28 +106,28 @@ impl LMOptimizerState {
     fn eval_energy(obs: &Obs, model: Vec6) -> (f32, Vec<f32>, Vec<usize>) {
         let nb_pixels = obs.template.len();
         let (nb_rows, _) = obs.template.shape();
-        let mut x = 0; // column "j"
-        let mut y = 0; // row "i"
+        let mut x = 0_usize; // column "j"
+        let mut y = 0_usize; // row "i"
         let mut inside_indices = Vec::with_capacity(nb_pixels);
         let mut residuals = Vec::with_capacity(nb_pixels);
         let mut energy = 0.0;
-        for (idx, tmp) in obs.template.iter().enumerate() {
+        for (idx, &tmp) in obs.template.iter().enumerate() {
             let (u, v) = warp(&model, x as f32, y as f32);
             if let Some(im) = interpolate(u, v, &obs.image) {
                 // precompute residuals and energy
-                let r = im - *tmp as f32;
-                energy = energy + r * r;
-                residuals.push(r);
+                let residual = im - f32::from(tmp);
+                energy += residual * residual;
+                residuals.push(residual);
                 inside_indices.push(idx); // keep only inside points
             }
             // update x and y positions
-            y = y + 1;
+            y += 1;
             if y >= nb_rows {
-                x = x + 1;
+                x += 1;
                 y = 0;
             }
         }
-        energy = energy / inside_indices.len() as f32;
+        energy /= inside_indices.len() as f32;
         (energy, residuals, inside_indices)
     }
 
@@ -140,8 +140,8 @@ impl LMOptimizerState {
             let jac = obs.jacobians[idx];
             let hes = obs.hessians[idx];
             let res = residuals[i];
-            gradient = gradient + jac * res;
-            hessian = hessian + hes;
+            gradient += jac * res;
+            hessian += hes;
         }
         EvalData {
             model,
@@ -152,7 +152,7 @@ impl LMOptimizerState {
     }
 } // LMOptimizerState
 
-impl<'a> OptimizerState<Obs<'a>, EvalState, Vec6, String> for LMOptimizerState {
+impl<'a> optimizer::State<Obs<'a>, EvalState, Vec6, String> for LMOptimizerState {
     /// Initialize the optimizer state.
     /// Levenberg-Marquardt coefficient start at 0.1.
     fn init(obs: &Obs, model: Vec6) -> Self {
@@ -164,13 +164,13 @@ impl<'a> OptimizerState<Obs<'a>, EvalState, Vec6, String> for LMOptimizerState {
 
     /// Compute the Levenberg-Marquardt step.
     fn step(&self) -> Result<Vec6, String> {
-        let mut hessian = self.eval_data.hessian.clone();
-        hessian.m11 = (1.0 + self.lm_coef) * hessian.m11;
-        hessian.m22 = (1.0 + self.lm_coef) * hessian.m22;
-        hessian.m33 = (1.0 + self.lm_coef) * hessian.m33;
-        hessian.m44 = (1.0 + self.lm_coef) * hessian.m44;
-        hessian.m55 = (1.0 + self.lm_coef) * hessian.m55;
-        hessian.m66 = (1.0 + self.lm_coef) * hessian.m66;
+        let mut hessian = self.eval_data.hessian;
+        hessian.m11 *= 1.0 + self.lm_coef;
+        hessian.m22 *= 1.0 + self.lm_coef;
+        hessian.m33 *= 1.0 + self.lm_coef;
+        hessian.m44 *= 1.0 + self.lm_coef;
+        hessian.m55 *= 1.0 + self.lm_coef;
+        hessian.m66 *= 1.0 + self.lm_coef;
         let cholesky = hessian.cholesky().ok_or("Error in cholesky.")?;
         let delta = cholesky.solve(&self.eval_data.gradient);
         let delta_warp = warp_mat(delta);
@@ -205,7 +205,7 @@ impl<'a> OptimizerState<Obs<'a>, EvalState, Vec6, String> for LMOptimizerState {
             // Max number of iterations not reached yet:
             (Err(energy), false) => {
                 let mut kept_state = self;
-                kept_state.lm_coef = 10.0 * kept_state.lm_coef;
+                kept_state.lm_coef *= 10.0;
                 println!("\t back from {}, lm_coef = {}", energy, kept_state.lm_coef);
                 (kept_state, Continue::Forward)
             }
@@ -213,7 +213,7 @@ impl<'a> OptimizerState<Obs<'a>, EvalState, Vec6, String> for LMOptimizerState {
                 println!("energy = {}", eval_data.energy);
                 let delta_energy = self.eval_data.energy - eval_data.energy;
                 let mut kept_state = self;
-                kept_state.lm_coef = 0.1 * kept_state.lm_coef;
+                kept_state.lm_coef *= 0.1;
                 kept_state.eval_data = eval_data;
                 let continuation = if delta_energy > 0.01 {
                     Continue::Forward
@@ -345,8 +345,8 @@ fn warp(model: &Vec6, x: f32, y: f32) -> (f32, f32) {
 /// [ 1+p1  p3  p5 ]
 /// [  p2  1+p4 p6 ]
 /// [  0    0   1  ]
+#[rustfmt::skip]
 fn warp_mat(params: Vec6) -> Mat3 {
-    #[cfg_attr(rustfmt, rustfmt_skip)]
     Mat3::new(
         params[0] + 1.0, params[2],       params[4],
         params[1],       params[3] + 1.0, params[5],
@@ -377,6 +377,8 @@ fn interpolate_u8(img: &Img, pixel: Vec2) -> u8 {
     interpolate(pixel.x, pixel.y, img).unwrap() as u8
 }
 
+#[allow(clippy::cast_lossless)]
+#[allow(clippy::many_single_char_names)]
 fn interpolate(x: f32, y: f32, image: &Img) -> Option<f32> {
     let (height, width) = image.shape();
     let u = x.floor();
@@ -406,26 +408,27 @@ fn interpolate(x: f32, y: f32, image: &Img) -> Option<f32> {
 fn affine_jacobians(grad: &(na::DMatrix<i16>, na::DMatrix<i16>)) -> Vec<Vec6> {
     let (grad_x, grad_y) = grad;
     let (nb_rows, _) = grad_x.shape();
-    let mut x = 0;
-    let mut y = 0;
+    let mut x = 0_usize;
+    let mut y = 0_usize;
     let mut jacobians = Vec::with_capacity(grad_x.len());
     for (&gx, &gy) in grad_x.iter().zip(grad_y.iter()) {
-        let gx_f = gx as f32;
-        let gy_f = gy as f32;
+        let gx_f = f32::from(gx);
+        let gy_f = f32::from(gy);
         let x_f = x as f32;
         let y_f = y as f32;
         // CF Baker and Matthews.
         let jac = Vec6::new(x_f * gx_f, x_f * gy_f, y_f * gx_f, y_f * gy_f, gx_f, gy_f);
         jacobians.push(jac);
-        y = y + 1;
+        y += 1;
         if y >= nb_rows {
-            x = x + 1;
+            x += 1;
             y = 0;
         }
     }
     jacobians
 }
 
+#[allow(clippy::ptr_arg)]
 fn hessians_vec(jacobians: &Vec<Vec6>) -> Vec<Mat6> {
     jacobians.iter().map(|j| j * j.transpose()).collect()
 }

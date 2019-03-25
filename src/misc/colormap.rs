@@ -12,6 +12,8 @@ pub fn viridis_u8() -> Vec<(u8, u8, u8)> {
         .collect()
 }
 
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_sign_loss)]
 fn to_u8(x: f32) -> u8 {
     (255.0 * x).round() as u8
 }

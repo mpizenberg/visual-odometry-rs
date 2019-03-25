@@ -11,6 +11,7 @@ use nalgebra as na;
 /// 1/2 * ( img(i+1,j) - img(i-1,j), img(i,j+1) - img(i,j-1) )
 ///
 /// Gradients of pixels at the border of the image are set to 0.
+#[allow(clippy::similar_names)]
 pub fn centered(img: &na::DMatrix<u8>) -> (na::DMatrix<i16>, na::DMatrix<i16>) {
     // TODO: might be better to return DMatrix<(i16,i16)>?
     let (nb_rows, nb_cols) = img.shape();
@@ -32,6 +33,8 @@ pub fn centered(img: &na::DMatrix<u8>) -> (na::DMatrix<i16>, na::DMatrix<i16>) {
 }
 
 /// Compute squared gradient norm from x and y gradient matrices.
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_sign_loss)]
 pub fn squared_norm(grad_x: &na::DMatrix<i16>, grad_y: &na::DMatrix<i16>) -> na::DMatrix<u16> {
     grad_x.zip_map(grad_y, |gx, gy| {
         let gx = i32::from(gx);
@@ -41,6 +44,8 @@ pub fn squared_norm(grad_x: &na::DMatrix<i16>, grad_y: &na::DMatrix<i16>) -> na:
 }
 
 /// Compute squared gradient norm directly from the image.
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_sign_loss)]
 pub fn squared_norm_direct(im: &na::DMatrix<u8>) -> na::DMatrix<u16> {
     let (nb_rows, nb_cols) = im.shape();
     let top = im.slice((0, 1), (nb_rows - 2, nb_cols - 2));
@@ -92,6 +97,8 @@ pub fn bloc_y(a: u8, b: u8, c: u8, d: u8) -> i16 {
 /// The block is of the form:
 ///   a c
 ///   b d
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_sign_loss)]
 pub fn bloc_squared_norm(a: u8, b: u8, c: u8, d: u8) -> u16 {
     let a = i32::from(a);
     let b = i32::from(b);

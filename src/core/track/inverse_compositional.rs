@@ -19,7 +19,7 @@ use crate::core::{
     multires,
     track::lm_optimizer::{self, LMOptimizerState},
 };
-use crate::math::optimizer::OptimizerState;
+use crate::math::optimizer::State as _;
 use crate::misc::helper;
 use crate::misc::type_aliases::{Float, Iso3, Mat6, Point2, Vec6};
 
@@ -74,7 +74,7 @@ impl Config {
     pub fn init(
         self,
         keyframe_depth_timestamp: f64,
-        depth_map: DMatrix<u16>,
+        depth_map: &DMatrix<u16>,
         keyframe_img_timestamp: f64,
         img: DMatrix<u8>,
     ) -> Tracker {
@@ -82,7 +82,7 @@ impl Config {
         let intrinsics_multires = self.intrinsics.clone().multi_res(self.nb_levels);
         let img_multires = multires::mean_pyramid(self.nb_levels, img);
         let keyframe_multires_data =
-            precompute_multires_data(&self, &depth_map, intrinsics_multires, img_multires);
+            precompute_multires_data(&self, depth_map, intrinsics_multires, img_multires);
 
         // Regroup everything under the returned Tracker.
         Tracker {
@@ -101,6 +101,7 @@ impl Config {
 } // impl Config
 
 /// Precompute the multi-resolution data of a frame.
+#[allow(clippy::used_underscore_binding)]
 fn precompute_multires_data(
     config: &Config,
     depth_map: &DMatrix<u16>,
@@ -126,14 +127,14 @@ fn precompute_multires_data(
     // Only keep the "usable" points, i.e. those with a known depth information.
     let from_depth = |z| inverse_depth::from_depth(config.depth_scale, z, config.idepth_variance);
     let idepth_candidates = helper::zip_mask_map(
-        &depth_map,
+        depth_map,
         &candidates_points,
         InverseDepth::Unknown,
         from_depth,
     );
     let fuse = |a, b, c, d| inverse_depth::fuse(a, b, c, d, inverse_depth::strategy_dso_mean);
     let idepth_multires = multires::limited_sequence(config.nb_levels, idepth_candidates, |m| {
-        multires::halve(&m, fuse)
+        multires::halve(m, fuse)
     });
     let usable_candidates_multires: Levels<_> = idepth_multires.iter().map(extract_z).collect();
 
@@ -164,10 +165,12 @@ impl Tracker {
     /// Internally mutates the tracker state.
     ///
     /// You can use `tracker.current_frame()` after tracking to retrieve the new frame pose.
+    #[allow(clippy::used_underscore_binding)]
+    #[allow(clippy::cast_precision_loss)]
     pub fn track(
         &mut self,
         depth_time: f64,
-        depth_map: DMatrix<u16>,
+        depth_map: &DMatrix<u16>,
         img_time: f64,
         img: DMatrix<u8>,
     ) {
@@ -226,7 +229,7 @@ impl Tracker {
             eprintln!("Changing keyframe after: {} seconds", delta_time);
             self.state.keyframe_multires_data = precompute_multires_data(
                 &self.config,
-                &depth_map,
+                depth_map,
                 keyframe_data.intrinsics_multires.clone(),
                 img_multires,
             );
@@ -253,6 +256,7 @@ impl Tracker {
 // }
 
 /// Extract known inverse depth values (and coordinates) into vectorized data.
+#[allow(clippy::used_underscore_binding)]
 fn extract_z(idepth_mat: &DMatrix<InverseDepth>) -> (Vec<(usize, usize)>, Vec<Float>) {
     let mut u = 0;
     let mut v = 0;
@@ -275,6 +279,8 @@ fn extract_z(idepth_mat: &DMatrix<InverseDepth>) -> (Vec<(usize, usize)>, Vec<Fl
 }
 
 /// Precompute jacobians for each candidate.
+#[allow(clippy::used_underscore_binding)]
+#[allow(clippy::cast_precision_loss)]
 fn warp_jacobians(
     intrinsics: &Intrinsics,
     coordinates: &[(usize, usize)],
@@ -302,6 +308,8 @@ fn warp_jacobians(
 /// Jacobian of the warping function for the inverse compositional algorithm.
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::many_single_char_names)]
+#[allow(clippy::used_underscore_binding)]
+#[allow(clippy::similar_names)]
 fn warp_jacobian_at(
     gu: Float,
     gv: Float,
@@ -340,6 +348,7 @@ fn hessians_vec(jacobians: &Vec<Vec6>) -> Vec<Mat6> {
 }
 
 /// Warp a point from an image to another by a given rigid body motion.
+#[allow(clippy::used_underscore_binding)]
 fn warp(model: &Iso3, x: Float, y: Float, _z: Float, intrinsics: &Intrinsics) -> (Float, Float) {
     // TODO: maybe move into the camera module?
     let x1 = intrinsics.back_project(Point2::new(x, y), 1.0 / _z);

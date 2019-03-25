@@ -43,7 +43,7 @@ fn my_run(args: &[String]) -> Result<(), Box<Error>> {
     let (depth_map, img) = read_images(&associations[0])?;
     let depth_time = associations[0].depth_timestamp;
     let img_time = associations[0].color_timestamp;
-    let mut tracker = config.init(depth_time, depth_map, img_time, img);
+    let mut tracker = config.init(depth_time, &depth_map, img_time, img);
 
     // Track every frame in the associations file.
     for assoc in associations.iter().skip(1) {
@@ -51,7 +51,12 @@ fn my_run(args: &[String]) -> Result<(), Box<Error>> {
         let (depth_map, img) = read_images(assoc)?;
 
         // Track the rgb-d image.
-        tracker.track(assoc.depth_timestamp, depth_map, assoc.color_timestamp, img);
+        tracker.track(
+            assoc.depth_timestamp,
+            &depth_map,
+            assoc.color_timestamp,
+            img,
+        );
 
         // Print to stdout the frame pose.
         let (timestamp, pose) = tracker.current_frame();
@@ -112,7 +117,7 @@ fn parse_associations<P: AsRef<Path>>(
     let mut file_reader = BufReader::new(file);
     let mut content = String::new();
     file_reader.read_to_string(&mut content)?;
-    tum_rgbd::parse::associations(content)
+    tum_rgbd::parse::associations(&content)
         .map(|v| v.iter().map(|a| abs_path(&file_path, a)).collect())
         .map_err(|s| s.into())
 }

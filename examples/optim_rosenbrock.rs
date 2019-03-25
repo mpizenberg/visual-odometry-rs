@@ -6,7 +6,7 @@ extern crate nalgebra as na;
 extern crate visual_odometry_rs as vors;
 
 use std::process::exit;
-use vors::math::optimizer::{Continue, OptimizerState};
+use vors::math::optimizer::{self, Continue, State as _};
 
 /// In this example, we implement the OptimizerState trait to estimate a rosenbrock function.
 /// rosenbrock: (a, b, x, y) -> (a-x)^2 + b*(y-x^2)^2
@@ -43,8 +43,8 @@ fn rosenbrock_res(x: f32, y: f32) -> Vec2 {
 }
 
 /// Jacobian
+#[rustfmt::skip]
 fn rosenbrock_jac(x: f32, y: f32) -> Mat2 {
-    #[cfg_attr(rustfmt, rustfmt_skip)]
     Mat2::new(
         -2.0 * (A - x)            , 0.0                  , // for 1st residual
         -4.0 * B * x * (y - x * x), 2.0 * B * (y - x * x), // for 2nd residual
@@ -88,7 +88,7 @@ impl LMOptimizerState {
     }
 }
 
-impl OptimizerState<(), EvalState, (f32, f32), String> for LMOptimizerState {
+impl optimizer::State<(), EvalState, (f32, f32), String> for LMOptimizerState {
     /// Initialize the optimizer state.
     /// Levenberg-Marquardt coefficient start at 0.1.
     fn init(_obs: &(), model: (f32, f32)) -> Self {
@@ -100,9 +100,9 @@ impl OptimizerState<(), EvalState, (f32, f32), String> for LMOptimizerState {
 
     /// Compute the Levenberg-Marquardt step.
     fn step(&self) -> Result<(f32, f32), String> {
-        let mut hessian = self.eval_data.hessian.clone();
-        hessian.m11 = (1.0 + self.lm_coef) * hessian.m11;
-        hessian.m22 = (1.0 + self.lm_coef) * hessian.m22;
+        let mut hessian = self.eval_data.hessian;
+        hessian.m11 *= 1.0 + self.lm_coef;
+        hessian.m22 *= 1.0 + self.lm_coef;
         let cholesky = hessian.cholesky().ok_or("Issue in Cholesky")?;
         let delta = cholesky.solve(&self.eval_data.gradient);
         let (x, y) = self.eval_data.model;
@@ -140,7 +140,7 @@ impl OptimizerState<(), EvalState, (f32, f32), String> for LMOptimizerState {
             // Can continue to iterate:
             (Err(model), false) => {
                 let mut kept_state = self;
-                kept_state.lm_coef = 10.0 * kept_state.lm_coef;
+                kept_state.lm_coef *= 10.0;
                 println!("\t back from {:?}, lm_coef = {}", model, kept_state.lm_coef);
                 (kept_state, Continue::Forward)
             }
@@ -151,7 +151,7 @@ impl OptimizerState<(), EvalState, (f32, f32), String> for LMOptimizerState {
                 );
                 let delta_energy = self.eval_data.energy - eval_data.energy;
                 let mut kept_state = self;
-                kept_state.lm_coef = 0.1 * kept_state.lm_coef;
+                kept_state.lm_coef *= 0.1;
                 kept_state.eval_data = eval_data;
                 let continuation = if delta_energy > 1e-10 {
                     Continue::Forward

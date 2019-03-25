@@ -62,5 +62,5 @@ fn parse_trajectory(file_path: PathBuf) -> Result<Vec<tum_rgbd::Frame>, Box<Erro
     let mut file_reader = BufReader::new(file);
     let mut content = String::new();
     file_reader.read_to_string(&mut content)?;
-    tum_rgbd::parse::trajectory(content).map_err(|s| s.into())
+    tum_rgbd::parse::trajectory(&content).map_err(|s| s.into())
 }

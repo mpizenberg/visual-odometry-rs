@@ -12,6 +12,7 @@ use nalgebra::DMatrix;
 ///
 /// Performs a transposition to accomodate for the
 /// column major matrix into the row major image.
+#[allow(clippy::cast_possible_truncation)]
 pub fn image_from_matrix(mat: &DMatrix<u8>) -> GrayImage {
     let (nb_rows, nb_cols) = mat.shape();
     let mut img_buf = GrayImage::new(nb_cols as u32, nb_rows as u32);
@@ -25,6 +26,7 @@ pub fn image_from_matrix(mat: &DMatrix<u8>) -> GrayImage {
 ///
 /// Performs a transposition to accomodate for the
 /// column major matrix into the row major image.
+#[allow(clippy::cast_possible_truncation)]
 pub fn rgb_from_matrix(mat: &DMatrix<(u8, u8, u8)>) -> RgbImage {
     let (nb_rows, nb_cols) = mat.shape();
     let mut img_buf = RgbImage::new(nb_cols as u32, nb_rows as u32);
@@ -39,6 +41,7 @@ pub fn rgb_from_matrix(mat: &DMatrix<(u8, u8, u8)>) -> RgbImage {
 ///
 /// Very performant since no copy is performed,
 /// but produces a transposed image due to differences in row/column major.
+#[allow(clippy::cast_possible_truncation)]
 pub fn image_from_matrix_transposed(mat: &DMatrix<u8>) -> ImageBuffer<Luma<u8>, &[u8]> {
     let (nb_rows, nb_cols) = mat.shape();
     ImageBuffer::from_raw(nb_rows as u32, nb_cols as u32, mat.as_slice())

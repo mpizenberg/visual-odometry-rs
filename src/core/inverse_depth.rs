@@ -4,8 +4,6 @@
 
 //! Helper functions to manipulate inverse depth data from depth images.
 
-use rand;
-
 use crate::misc::type_aliases::Float;
 
 /// An inverse depth can be one of three values: unknown, discarded, or known with a given
@@ -33,6 +31,9 @@ pub fn from_depth(scale: Float, depth: u16, variance: Float) -> InverseDepth {
 /// Transform inverse depth value back into a depth value with a given scaling.
 ///
 /// Unknown or discarded values are encoded with 0.
+#[allow(clippy::cast_precision_loss)]
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_sign_loss)]
 pub fn to_depth(scale: Float, idepth: InverseDepth) -> u16 {
     match idepth {
         InverseDepth::WithVariance(x, _) => (scale / x).round() as u16,
@@ -53,13 +54,14 @@ pub fn fuse<F>(
     strategy: F,
 ) -> InverseDepth
 where
-    F: Fn(Vec<(Float, Float)>) -> InverseDepth,
+    F: Fn(&[(Float, Float)]) -> InverseDepth,
 {
     strategy(
         [a, b, c, d]
             .iter()
             .filter_map(with_variance)
-            .collect::<Vec<_>>(),
+            .collect::<Vec<_>>()
+            .as_slice(),
     )
 }
 
@@ -71,30 +73,13 @@ fn with_variance(idepth: &InverseDepth) -> Option<(Float, Float)> {
     }
 }
 
-/// Random discarding when merging.
-///
-/// At random, either discard the inverse depth, or keep the first inverse depth.
-pub fn strategy_random(valid_values: Vec<(Float, Float)>) -> InverseDepth {
-    match valid_values.as_slice() {
-        [(idepth, var)] | [(idepth, var), _] | [(idepth, var), _, _] | [(idepth, var), _, _, _] => {
-            if rand::random() {
-                InverseDepth::WithVariance(*idepth, *var)
-            } else {
-                InverseDepth::Discarded
-            }
-        }
-        _ => InverseDepth::Unknown,
-    }
-}
-
 /// Merge idepth pixels of a bloc into their mean idepth.
 ///
 /// Just like in DSO, inverse depth do not have statistical variance
 /// but some kind of "weight", proportional to how "trusty" they are.
 /// So here, the variance is to be considered as a weight instead.
-pub fn strategy_dso_mean(valid_values: Vec<(Float, Float)>) -> InverseDepth {
-    match valid_values.as_slice() {
-        [] => InverseDepth::Unknown,
+pub fn strategy_dso_mean(valid_values: &[(Float, Float)]) -> InverseDepth {
+    match valid_values {
         [(d1, v1)] => InverseDepth::WithVariance(*d1, *v1),
         [(d1, v1), (d2, v2)] => {
             let sum = v1 + v2;
@@ -117,9 +102,8 @@ pub fn strategy_dso_mean(valid_values: Vec<(Float, Float)>) -> InverseDepth {
 ///
 /// Variance increases if only one inverse depth is known.
 /// Variance decreases if the four inverse depths are known.
-pub fn strategy_statistically_similar(valid_values: Vec<(Float, Float)>) -> InverseDepth {
-    match valid_values.as_slice() {
-        [] => InverseDepth::Unknown,
+pub fn strategy_statistically_similar(valid_values: &[(Float, Float)]) -> InverseDepth {
+    match valid_values {
         [(d1, v1)] => InverseDepth::WithVariance(*d1, 2.0 * v1), // v = 2/1 * mean
         [(d1, v1), (d2, v2)] => {
             let new_d = (d1 * v2 + d2 * v1) / (v1 + v2);

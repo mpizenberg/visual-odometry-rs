@@ -17,6 +17,7 @@ use crate::core::gradient;
 /// PS: since we are using 2x2 blocs,
 /// border information is lost for odd resolutions.
 /// Some precision is also left to keep the pyramid data as `u8`.
+#[allow(clippy::cast_possible_truncation)]
 pub fn mean_pyramid(max_levels: usize, mat: DMatrix<u8>) -> Vec<DMatrix<u8>> {
     limited_sequence(max_levels, mat, |m| {
         halve(m, |a, b, c, d| {

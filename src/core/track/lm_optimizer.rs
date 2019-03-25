@@ -2,13 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-//! Levenberg-Marquardt implementation of the OptimizerState trait
+//! Levenberg-Marquardt implementation of the `optimizer::State` trait
 //! for the inverse compositional tracking algorithm.
 
 use nalgebra::{DMatrix, UnitQuaternion};
 
 use crate::core::camera::Intrinsics;
-use crate::math::optimizer::{Continue, OptimizerState};
+use crate::math::optimizer::{self, Continue};
 use crate::math::se3;
 use crate::misc::type_aliases::{Float, Iso3, Mat6, Point2, Vec6};
 
@@ -57,12 +57,14 @@ pub struct Obs<'a> {
     pub hessians: &'a Vec<Mat6>,
 }
 
-/// (energy, inside_indices, residuals)
+/// `(energy, inside_indices, residuals)`.
 type Precomputed = (Float, Vec<usize>, Vec<Float>);
 
 impl LMOptimizerState {
     /// Precompute the energy of a model.
     /// Also return the residuals vector and the indices of candidate points used.
+    #[allow(clippy::cast_precision_loss)]
+    #[allow(clippy::used_underscore_binding)]
     fn eval_energy(obs: &Obs, model: &Iso3) -> Precomputed {
         let mut inside_indices = Vec::new();
         let mut residuals = Vec::new();
@@ -70,8 +72,8 @@ impl LMOptimizerState {
         for (idx, &(x, y)) in obs.coordinates.iter().enumerate() {
             let _z = obs._z_candidates[idx];
             // check if warp(x,y) is inside the image
-            let (u, v) = warp(model, x as Float, y as Float, _z, &obs.intrinsics);
-            if let Some(im) = interpolate(u, v, &obs.image) {
+            let (u, v) = warp(model, x as Float, y as Float, _z, obs.intrinsics);
+            if let Some(im) = interpolate(u, v, obs.image) {
                 // precompute residuals and energy
                 let tmp = obs.template[(y, x)];
                 let r = im - Float::from(tmp);
@@ -105,8 +107,8 @@ impl LMOptimizerState {
     }
 }
 
-/// impl<'a> OptimizerState<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState.
-impl<'a> OptimizerState<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState {
+/// `impl<'a> optimizer::State<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState`.
+impl<'a> optimizer::State<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState {
     /// Initialize the optimizer state.
     fn init(obs: &Obs, model: Iso3) -> Self {
         Self {
@@ -158,7 +160,7 @@ impl<'a> OptimizerState<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState {
             (Err(_), true) => (self, Continue::Stop),
             (Ok(eval_data), true) => {
                 // eprintln!("Energy: {}", eval_data.energy);
-                let kept_state = LMOptimizerState {
+                let kept_state = Self {
                     lm_coef: self.lm_coef, // does not matter actually
                     eval_data,
                 };
@@ -180,7 +182,7 @@ impl<'a> OptimizerState<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState {
                     Continue::Stop
                 };
                 // eprintln!("Energy: {}", eval_data.energy);
-                let kept_state = LMOptimizerState {
+                let kept_state = Self {
                     lm_coef: 0.1 * self.lm_coef,
                     eval_data,
                 };
@@ -188,7 +190,7 @@ impl<'a> OptimizerState<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState {
             }
         }
     } // fn stop_criterion
-} // impl OptimizerState<...> for LMOptimizerState
+} // impl optimizer::State<...> for LMOptimizerState
 
 // Helper ######################################################################
 
@@ -207,6 +209,7 @@ fn renormalize_unit_quaternion(uq: UnitQuaternion<Float>) -> UnitQuaternion<Floa
 }
 
 /// Warp a point from an image to another by a given rigid body motion.
+#[allow(clippy::used_underscore_binding)]
 fn warp(model: &Iso3, x: Float, y: Float, _z: Float, intrinsics: &Intrinsics) -> (Float, Float) {
     // TODO: maybe move into the camera module?
     let x1 = intrinsics.back_project(Point2::new(x, y), 1.0 / _z);
@@ -218,6 +221,9 @@ fn warp(model: &Iso3, x: Float, y: Float, _z: Float, intrinsics: &Intrinsics) ->
 /// Simple linear interpolation of a pixel with floating point coordinates.
 /// Return `None` if the point is outside of the image boundaries.
 #[allow(clippy::many_single_char_names)]
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_sign_loss)]
+#[allow(clippy::cast_precision_loss)]
 fn interpolate(x: Float, y: Float, image: &DMatrix<u8>) -> Option<Float> {
     let (height, width) = image.shape();
     let u = x.floor();

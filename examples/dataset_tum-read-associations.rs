@@ -28,7 +28,7 @@ fn run(args: Vec<String>) -> Result<(), Box<Error>> {
     // Print to stdout first few associations.
     println!("First 3 associations:");
     for assoc in associations.iter().take(3) {
-        println!("");
+        println!();
         println!("Depth image timestamp: {}", assoc.depth_timestamp);
         println!(
             "Depth image absolute path: {}",
@@ -72,7 +72,7 @@ fn parse_associations(file_path: PathBuf) -> Result<Vec<tum_rgbd::Association>, 
     let mut file_reader = BufReader::new(file);
     let mut content = String::new();
     file_reader.read_to_string(&mut content)?;
-    tum_rgbd::parse::associations(content)
+    tum_rgbd::parse::associations(&content)
         .map(|v| v.iter().map(|a| abs_path(&file_path, a)).collect())
         .map_err(|s| s.into())
 }
