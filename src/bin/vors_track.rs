@@ -7,7 +7,7 @@ extern crate nalgebra as na;
 extern crate visual_odometry_rs as vors;
 
 use na::DMatrix;
-use std::{env, error::Error, fs, io::BufReader, io::Read, path::PathBuf};
+use std::{env, error::Error, fs, io::BufReader, io::Read, path::Path, path::PathBuf};
 
 use vors::core::camera::Intrinsics;
 use vors::core::track::inverse_compositional as track;
@@ -16,14 +16,14 @@ use vors::misc::{helper, interop};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if let Err(error) = my_run(args) {
+    if let Err(error) = my_run(&args) {
         eprintln!("{:?}", error);
     }
 }
 
 const USAGE: &str = "Usage: ./vors_track [fr1|fr2|fr3|icl] associations_file";
 
-fn my_run(args: Vec<String>) -> Result<(), Box<Error>> {
+fn my_run(args: &[String]) -> Result<(), Box<Error>> {
     // Check that the arguments are correct.
     let valid_args = check_args(args)?;
 
@@ -67,33 +67,30 @@ struct Args {
 }
 
 /// Verify that command line arguments are correct.
-fn check_args(args: Vec<String>) -> Result<Args, String> {
+fn check_args(args: &[String]) -> Result<Args, String> {
     // eprintln!("{:?}", args);
-    match args.as_slice() {
-        [_, camera_id, associations_file_path_str] => {
-            let intrinsics = create_camera(camera_id)?;
-            let associations_file_path = PathBuf::from(associations_file_path_str);
-            if associations_file_path.is_file() {
-                Ok(Args {
-                    intrinsics,
-                    associations_file_path,
-                })
-            } else {
-                eprintln!("{}", USAGE);
-                Err(format!(
-                    "The association file does not exist or is not reachable: {}",
-                    associations_file_path_str
-                ))
-            }
-        }
-        _ => {
+    if let [_, camera_id, associations_file_path_str] = args {
+        let intrinsics = create_camera(camera_id)?;
+        let associations_file_path = PathBuf::from(associations_file_path_str);
+        if associations_file_path.is_file() {
+            Ok(Args {
+                intrinsics,
+                associations_file_path,
+            })
+        } else {
             eprintln!("{}", USAGE);
-            Err("Wrong number of arguments".to_string())
+            Err(format!(
+                "The association file does not exist or is not reachable: {}",
+                associations_file_path_str
+            ))
         }
+    } else {
+        eprintln!("{}", USAGE);
+        Err("Wrong number of arguments".to_string())
     }
 }
 
-/// Create camera depending on camera_id command line argument.
+/// Create camera depending on `camera_id` command line argument.
 fn create_camera(camera_id: &str) -> Result<Intrinsics, String> {
     match camera_id {
         "fr1" => Ok(tum_rgbd::INTRINSICS_FR1),
@@ -108,7 +105,9 @@ fn create_camera(camera_id: &str) -> Result<Intrinsics, String> {
 }
 
 /// Open an association file and parse it into a vector of Association.
-fn parse_associations(file_path: PathBuf) -> Result<Vec<tum_rgbd::Association>, Box<Error>> {
+fn parse_associations<P: AsRef<Path>>(
+    file_path: P,
+) -> Result<Vec<tum_rgbd::Association>, Box<Error>> {
     let file = fs::File::open(&file_path)?;
     let mut file_reader = BufReader::new(file);
     let mut content = String::new();
@@ -119,8 +118,11 @@ fn parse_associations(file_path: PathBuf) -> Result<Vec<tum_rgbd::Association>, 
 }
 
 /// Transform relative images file paths into absolute ones.
-fn abs_path(file_path: &PathBuf, assoc: &tum_rgbd::Association) -> tum_rgbd::Association {
-    let parent = file_path.parent().expect("How can this have no parent");
+fn abs_path<P: AsRef<Path>>(file_path: P, assoc: &tum_rgbd::Association) -> tum_rgbd::Association {
+    let parent = file_path
+        .as_ref()
+        .parent()
+        .expect("How can this have no parent");
     tum_rgbd::Association {
         depth_timestamp: assoc.depth_timestamp,
         depth_file_path: parent.join(&assoc.depth_file_path),
