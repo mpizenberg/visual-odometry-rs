@@ -4,6 +4,7 @@
 
 //! Math-related modules.
 
+pub mod accumulator;
 pub mod optimizer;
 pub mod se3;
 pub mod so3;

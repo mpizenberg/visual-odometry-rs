@@ -35,3 +35,7 @@ criterion = "0.2" # Benchmarks.
 [[bench]]
 name = "mean_pyramid"
 harness = false
+
+[[bench]]
+name = "accumulator"
+harness = false
