@@ -208,6 +208,7 @@ impl Tracker {
             let (motion, photo_a, photo_b) = lm_model;
             self.state.current_frame_pose = self.state.keyframe_pose * motion.inverse();
             self.state.current_frame_exposure = (photo_a, photo_b);
+            // eprintln!("a: {}, b: {}", photo_a, photo_b);
         }
 
         // Check if we need to change the keyframe.

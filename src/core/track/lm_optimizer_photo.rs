@@ -104,11 +104,13 @@ impl LMOptimizerState {
             let mut jac = DVec::zeros(8);
             let (x, y) = obs.coordinates[idx];
             let tmp_color = obs.template[(y, x)];
+            let alpha_ratio = (a - a_tmp).exp();
             jac[7] = -1.0;
-            jac[6] = (a - a_tmp).exp() * (Float::from(tmp_color) - b_tmp);
+            jac[6] = alpha_ratio * (b_tmp - Float::from(tmp_color));
 
             // Fill geometric terms of jac.
-            *jac.fixed_rows_mut::<U6>(0) = *obs.jacobians[idx];
+            // *jac.fixed_rows_mut::<U6>(0) = *obs.jacobians[idx];
+            *jac.fixed_rows_mut::<U6>(0) = *(alpha_ratio * obs.jacobians[idx]);
 
             // TODO: replace with accumulator
             let r = residuals[i];
@@ -154,8 +156,8 @@ impl<'a> optimizer::State<Obs<'a>, EvalState, Model, String> for LMOptimizerStat
         let delta_warp = se3::exp(delta.fixed_rows::<U6>(0).into_owned());
         let (motion, photo_a, photo_b) = self.eval_data.model;
         let new_motion = renormalize(motion * delta_warp.inverse());
-        let new_photo_a = photo_a + delta[6];
-        let new_photo_b = photo_b + delta[7];
+        let new_photo_a = photo_a - delta[6];
+        let new_photo_b = photo_b - delta[7];
         Ok((new_motion, new_photo_a, new_photo_b))
     }
 
