@@ -53,12 +53,10 @@ pub struct Obs<'a> {
     pub _z_candidates: &'a Vec<Float>,
     /// Jacobians precomputed for the points used for the tracking.
     pub jacobians: &'a Vec<Vec6>,
-    /// Hessian matrices precomputed for the points used for the tracking.
-    pub hessian_accum: &'a accumulator::SymMat6,
 }
 
 /// `(energy, inside_indices, residuals)`.
-type Precomputed = (Float, Vec<usize>, Vec<Float>, Vec<usize>);
+type Precomputed = (Float, Vec<usize>, Vec<Float>);
 
 impl LMOptimizerState {
     /// Precompute the energy of a model.
@@ -86,23 +84,20 @@ impl LMOptimizerState {
             }
         }
         let energy = energy_sum / residuals.len() as Float;
-        (energy, inside_indices, residuals, outside_indices)
+        (energy, inside_indices, residuals)
     }
 
     /// Fully evaluate a model.
     fn compute_eval_data(obs: &Obs, model: Iso3, pre: Precomputed) -> EvalData {
-        let (energy, inside_indices, residuals, outside_indices) = pre;
+        let (energy, inside_indices, residuals) = pre;
         let mut gradient = Vec6::zeros();
+        let mut hessian_accum = accumulator::SymMat6::new();
         // Build gradient with inside points.
         for (i, idx) in inside_indices.into_iter().enumerate() {
             let jac = obs.jacobians[idx];
             let r = residuals[i];
             gradient += jac * r;
-        }
-        // Clear hessian of outside points.
-        let mut hessian_accum = obs.hessian_accum.clone();
-        for idx in outside_indices.into_iter() {
-            hessian_accum.add_vec(&(-obs.jacobians[idx]));
+            hessian_accum.add_vec(&jac);
         }
         hessian_accum.flush();
         EvalData {

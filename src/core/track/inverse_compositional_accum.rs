@@ -19,7 +19,7 @@ use crate::core::{
     multires,
     track::lm_optimizer_accum::{self as lm_optimizer, LMOptimizerState},
 };
-use crate::math::{accumulator, optimizer::State as _};
+use crate::math::optimizer::State as _;
 use crate::misc::helper;
 use crate::misc::type_aliases::{Float, Iso3, Point2, Vec6};
 
@@ -66,7 +66,6 @@ struct MultiresData {
     img_multires: Levels<DMatrix<u8>>,
     usable_candidates_multires: Levels<(Vec<(usize, usize)>, Vec<Float>)>,
     jacobians_multires: Levels<Vec<Vec6>>,
-    hessians_multires: Levels<accumulator::SymMat6>,
 }
 
 impl Config {
@@ -147,16 +146,12 @@ fn precompute_multires_data(
     .map(|(intrinsics, (coord, _z), (gx, gy))| warp_jacobians(intrinsics, coord, _z, gx, gy))
     .collect();
 
-    // Precompute the Hessians.
-    let hessians_multires: Levels<_> = jacobians_multires.iter().map(accumulate_hessian).collect();
-
     // Regroup everything under a MultiresData.
     MultiresData {
         intrinsics_multires,
         img_multires,
         usable_candidates_multires,
         jacobians_multires,
-        hessians_multires,
     }
 }
 
@@ -186,7 +181,6 @@ impl Tracker {
                 coordinates: &keyframe_data.usable_candidates_multires[lvl].0,
                 _z_candidates: &keyframe_data.usable_candidates_multires[lvl].1,
                 jacobians: &keyframe_data.jacobians_multires[lvl],
-                hessian_accum: &keyframe_data.hessians_multires[lvl],
             };
             match LMOptimizerState::iterative_solve(&obs, lm_model) {
                 Ok((lm_state, _)) => {
@@ -338,17 +332,6 @@ fn warp_jacobian_at(
         gu * (a * c * _fuv + fu) + gv * (b * c * _fuv),     //  angular velocity terms
         gu * (-fu * fu * b + s * c) * _fuv + gv * (c / fu), //
     )
-}
-
-/// Compute hessians components for each candidate point.
-#[allow(clippy::ptr_arg)] // TODO: Applying clippy lint here results in compilation error.
-fn accumulate_hessian(jacobians: &Vec<Vec6>) -> accumulator::SymMat6 {
-    // TODO: might be better to inline this within the function computing the jacobians.
-    let mut hessian_accum = accumulator::SymMat6::new();
-    for jac in jacobians.iter() {
-        hessian_accum.add_vec(jac);
-    }
-    hessian_accum
 }
 
 /// Warp a point from an image to another by a given rigid body motion.
