@@ -18,6 +18,8 @@ pub type Point3 = na::Point3<Float>;
 pub type Vec3 = na::Vector3<Float>;
 /// A vector with six Float coordinates.
 pub type Vec6 = na::Vector6<Float>;
+/// A vector of dynamic size.
+pub type DVec = na::DVector<Float>;
 
 /// A 3x3 matrix of Floats.
 pub type Mat3 = na::Matrix3<Float>;
@@ -25,6 +27,8 @@ pub type Mat3 = na::Matrix3<Float>;
 pub type Mat4 = na::Matrix4<Float>;
 /// A 6x6 matrix of Floats.
 pub type Mat6 = na::Matrix6<Float>;
+/// A dynamically sized matrix of Floats.
+pub type DMat = na::DMatrix<Float>;
 
 /// A direct 3D isometry, also known as rigid body motion.
 pub type Iso3 = na::Isometry3<Float>;
