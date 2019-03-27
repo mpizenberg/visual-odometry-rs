@@ -5,4 +5,6 @@
 //! Useful types and functions for tracking a camera.
 
 pub mod inverse_compositional;
+pub mod inverse_compositional_accum;
 pub mod lm_optimizer;
+pub mod lm_optimizer_accum;

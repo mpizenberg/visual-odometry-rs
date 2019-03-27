@@ -11,6 +11,7 @@ use crate::misc::type_aliases::{Float, Mat6, Vec6};
 const SYM_MAT_6_THRESHOLD: u32 = 100;
 
 /// Symmetric matrix accumulator.
+#[derive(Clone)]
 pub struct SymMat6 {
     nb_data: u32,
     data: MatrixMN<Float, U21, U1>,
