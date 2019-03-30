@@ -7,6 +7,8 @@
 pub mod inverse_compositional;
 pub mod inverse_compositional_accum;
 pub mod inverse_compositional_photo;
+pub mod inverse_compositional_robust;
 pub mod lm_optimizer;
 pub mod lm_optimizer_accum;
 pub mod lm_optimizer_photo;
+pub mod lm_optimizer_robust;
