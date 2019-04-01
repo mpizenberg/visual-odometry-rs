@@ -68,6 +68,30 @@ impl SymMat6 {
         }
     }
 
+    /// Add a term w * vv^t to the symmetric matrix accumulator.
+    #[inline]
+    pub fn add_vec_weighted(&mut self, weight: Float, vec: &Vec6) {
+        let mut vec_data = unsafe { MatrixMN::<Float, U21, U1>::new_uninitialized() };
+        let mut index = 0_usize;
+        for j in 0..6 {
+            let data_j = weight * unsafe { vec.vget_unchecked(j) };
+            for i in j..6 {
+                unsafe {
+                    *vec_data.vget_unchecked_mut(index) = data_j * vec.vget_unchecked(i);
+                }
+                index += 1;
+            }
+        }
+        if self.nb_data < SYM_MAT_6_THRESHOLD {
+            self.nb_data += 1;
+            self.data += vec_data;
+        } else {
+            self.nb_data = 1;
+            self.data_hundreds += self.data;
+            self.data = vec_data;
+        }
+    }
+
     /// Accumulate all values into the field used in the `to_mat` function.
     /// Clear the other fields.
     #[inline]

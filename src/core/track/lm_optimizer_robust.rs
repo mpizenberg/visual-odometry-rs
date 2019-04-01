@@ -9,7 +9,7 @@ use nalgebra::{DMatrix, UnitQuaternion};
 
 use crate::core::camera::Intrinsics;
 use crate::math::optimizer::{self, Continue};
-use crate::math::se3;
+use crate::math::{accumulator, se3};
 use crate::misc::type_aliases::{Float, Iso3, Mat6, Point2, Vec6};
 
 /// State of the Levenberg-Marquardt optimizer.
@@ -98,16 +98,17 @@ impl LMOptimizerState {
     fn compute_eval_data(obs: &Obs, model: Iso3, pre: Precomputed) -> EvalData {
         let (energy, inside_indices, residuals, weights) = pre;
         let mut gradient = Vec6::zeros();
-        let mut hessian = Mat6::zeros();
+        let mut hessian_accum = accumulator::SymMat6::new();
         for (i, idx) in inside_indices.into_iter().enumerate() {
             let jac = obs.jacobians[idx];
             let r = residuals[i];
             let w = weights[i];
             gradient += jac * (w * r);
-            hessian += w * jac * jac.transpose();
+            hessian_accum.add_vec_weighted(w, &jac);
         }
+        hessian_accum.flush();
         EvalData {
-            hessian,
+            hessian: hessian_accum.to_mat(),
             gradient,
             energy,
             model,
