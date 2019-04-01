@@ -70,26 +70,27 @@ impl LMOptimizerState {
         let mut residuals = Vec::new();
         let mut weights = Vec::new();
         let mut energy_sum = 0.0;
+        let mut nb_inner_points = 0_u32;
         for (idx, &(x, y)) in obs.coordinates.iter().enumerate() {
             let _z = obs._z_candidates[idx];
             // check if warp(x,y) is inside the image
             let (u, v) = warp(model, x as Float, y as Float, _z, obs.intrinsics);
             if let Some(im) = interpolate(u, v, obs.image) {
                 // precompute residuals and energy
+                nb_inner_points += 1;
                 let tmp = obs.template[(y, x)];
                 let r = im - Float::from(tmp);
+                let r_2 = r * r;
+                let weight = 1.0 / (1000.0 + r_2);
+                energy_sum += weight * r_2;
                 if r.abs() < 50.0 {
-                    let r_2 = r * r;
-                    let denum = 10.0 + r_2;
-                    energy_sum += r_2 / denum;
-                    let weight = 1.0 / denum.sqrt();
                     residuals.push(r);
                     weights.push(weight);
                     inside_indices.push(idx); // keep only inside points
                 }
             }
         }
-        let energy = energy_sum / residuals.len() as Float;
+        let energy = energy_sum / nb_inner_points as Float;
         (energy, inside_indices, residuals, weights)
     }
 
@@ -161,7 +162,7 @@ impl<'a> optimizer::State<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState
     /// Also update the Levenberg-Marquardt coefficient
     /// depending on if the energy increased or decreased.
     fn stop_criterion(self, nb_iter: usize, eval_state: EvalState) -> (Self, Continue) {
-        let too_many_iterations = nb_iter > 20;
+        let too_many_iterations = nb_iter > 30;
         match (eval_state, too_many_iterations) {
             // Max number of iterations reached:
             (Err(_), true) => (self, Continue::Stop),
@@ -183,7 +184,7 @@ impl<'a> optimizer::State<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState
             (Ok(eval_data), false) => {
                 let d_energy = self.eval_data.energy - eval_data.energy;
                 // 1.0 is totally empiric here
-                let continuation = if d_energy > 0.1 {
+                let continuation = if d_energy > 0.0001 {
                     Continue::Forward
                 } else {
                     Continue::Stop
