@@ -42,7 +42,14 @@ fn my_run(args: &[String]) -> Result<(), Box<Error>> {
         // Load color image.
         let img = read_image(&assoc.color_file_path)?;
         let (candidates, imgs) = generate_candidates(img.clone(), nb_levels, diff_threshold);
-        save_all_candidates(candidates, imgs, &out_dir, assoc.color_timestamp)?;
+        // save_all_candidates(candidates, imgs, &out_dir, assoc.color_timestamp)?;
+        save_candidates(
+            candidates.last().unwrap(),
+            &imgs[0],
+            &out_dir,
+            assoc.color_timestamp,
+            0,
+        )?;
     }
 
     Ok(())

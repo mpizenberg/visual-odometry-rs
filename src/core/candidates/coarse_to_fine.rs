@@ -18,7 +18,9 @@ where
 {
     let (nrows, ncols) = gradients.last().unwrap().shape();
     let mut init_candidates = Vec::new();
-    init_candidates.push(DMatrix::repeat(nrows, ncols, true));
+    // Discard pixels on sides for the lowest resolution (will propagate).
+    let low_res_candidates = DMatrix::repeat(nrows, ncols, true);
+    init_candidates.push(discard_sides(low_res_candidates));
     let prune = |a, b, c, d| prune_with_thresh(diff_threshold, a, b, c, d);
     gradients
         .iter()
@@ -29,6 +31,24 @@ where
             multires_masks.push(new_mask);
             multires_masks
         })
+}
+
+fn discard_sides(mask: DMatrix<bool>) -> DMatrix<bool> {
+    let (nrows, ncols) = mask.shape();
+    let mut mask = mask;
+    for pix in mask.column_mut(0).iter_mut() {
+        *pix = false;
+    }
+    for pix in mask.column_mut(ncols - 1).iter_mut() {
+        *pix = false;
+    }
+    for pix in mask.row_mut(0).iter_mut() {
+        *pix = false;
+    }
+    for pix in mask.row_mut(nrows - 1).iter_mut() {
+        *pix = false;
+    }
+    mask
 }
 
 /// Apply a predicate function on each 2x2 bloc.
