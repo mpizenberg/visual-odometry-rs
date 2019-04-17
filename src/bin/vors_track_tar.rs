@@ -7,7 +7,7 @@ extern crate nalgebra as na;
 extern crate visual_odometry_rs as vors;
 
 use na::DMatrix;
-use std::{env, error::Error, io::Read, path::PathBuf};
+use std::{env, error::Error, io::Read, io::Seek, io::SeekFrom, path::PathBuf};
 
 use byteorder::{BigEndian, ReadBytesExt};
 use png::HasParameters;
@@ -34,14 +34,25 @@ fn my_run(args: &[String]) -> Result<(), Box<Error>> {
     // Check that the arguments are correct.
     let valid_args = check_args(args)?;
 
-    // Load data from the archive.
-    // let archive_file = File::open(&valid_args.archive_path)?;
-    // let data = load_data(archive_file)?;
-    let data = load_data_from(&valid_args.archive_path)?;
+    // Prepare file entries from the archive.
+    let mut archive_file = File::open(&valid_args.archive_path)?;
+    let mut archive = tar::Archive::new(&archive_file);
+    let mut entries = HashMap::new();
+    for file in archive.entries()? {
+        // Check for an I/O error.
+        let file = file?;
+        entries.insert(
+            file.header().path()?.to_str().expect("oops").to_owned(),
+            FileEntry {
+                offset: file.raw_file_position(),
+                length: file.header().size()?,
+            },
+        );
+    }
 
     // Build a vector containing timestamps and full paths of images.
-    let associations_buffer = data.get("associations.txt").expect("sad");
-    let associations = parse_associations_buf(associations_buffer)?;
+    let associations_buffer = get_buffer("associations.txt", &mut archive_file, &entries)?;
+    let associations = parse_associations_buf(associations_buffer.as_slice())?;
 
     // Setup tracking configuration.
     let config = track::Config {
@@ -53,7 +64,7 @@ fn my_run(args: &[String]) -> Result<(), Box<Error>> {
     };
 
     // Initialize tracker with first depth and color image.
-    let (depth_map, img) = read_images_buf(&associations[0], &data)?;
+    let (depth_map, img) = read_images(&associations[0], &mut archive_file, &entries)?;
     let depth_time = associations[0].depth_timestamp;
     let img_time = associations[0].color_timestamp;
     let mut tracker = config.init(depth_time, &depth_map, img_time, img);
@@ -61,7 +72,7 @@ fn my_run(args: &[String]) -> Result<(), Box<Error>> {
     // Track every frame in the associations file.
     for assoc in associations.iter().skip(1) {
         // Load depth and color images.
-        let (depth_map, img) = read_images_buf(assoc, &data)?;
+        let (depth_map, img) = read_images(assoc, &mut archive_file, &entries)?;
 
         // Track the rgb-d image.
         tracker.track(
@@ -122,47 +133,6 @@ fn create_camera(camera_id: &str) -> Result<Intrinsics, String> {
     }
 }
 
-/// Load the archived data into a hashmap with file paths as keys.
-fn load_data_from(archive_path: &PathBuf) -> Result<HashMap<String, Vec<u8>>, std::io::Error> {
-    let archive_file = File::open(archive_path)?;
-    let mut archive = tar::Archive::new(archive_file);
-
-    // Create a hashmap with the content
-    let mut data = HashMap::new();
-    for file in archive.entries()? {
-        // Check for an I/O error.
-        let mut file = file?;
-
-        // Insert the file into the hashmap with its name as key.
-        let file_path = file.header().path()?.to_str().expect("oops").to_owned();
-        let mut buffer = Vec::with_capacity(file.header().size()? as usize);
-        file.read_to_end(&mut buffer)?;
-        data.insert(file_path, buffer);
-    }
-
-    Ok(data)
-}
-
-/// Load the archived data into a hashmap with file paths as keys.
-fn load_data<R: Read>(r: R) -> Result<HashMap<String, Vec<u8>>, std::io::Error> {
-    let mut archive = tar::Archive::new(r);
-
-    // Create a hashmap with the content
-    let mut data = HashMap::new();
-    for file in archive.entries()? {
-        // Check for an I/O error.
-        let mut file = file?;
-
-        // Insert the file into the hashmap with its name as key.
-        let file_path = file.header().path()?.to_str().expect("oops").to_owned();
-        let mut buffer = Vec::with_capacity(file.header().size()? as usize);
-        file.read_to_end(&mut buffer)?;
-        data.insert(file_path, buffer);
-    }
-
-    Ok(data)
-}
-
 /// Open an association file (in bytes form) and parse it into a vector of Association.
 fn parse_associations_buf(buffer: &[u8]) -> Result<Vec<tum_rgbd::Association>, Box<Error>> {
     let mut content = String::new();
@@ -171,20 +141,45 @@ fn parse_associations_buf(buffer: &[u8]) -> Result<Vec<tum_rgbd::Association>, B
     tum_rgbd::parse::associations(&content).map_err(|s| s.into())
 }
 
+struct FileEntry {
+    offset: u64,
+    length: u64,
+}
+
+fn get_buffer<R: Read + Seek>(
+    name: &str,
+    file: &mut R,
+    entries: &HashMap<String, FileEntry>,
+) -> Result<Vec<u8>, std::io::Error> {
+    let entry = entries.get(name).expect("Entry is not in archive");
+    read_file_entry(entry, file)
+}
+
+fn read_file_entry<R: Read + Seek>(
+    entry: &FileEntry,
+    file: &mut R,
+) -> Result<Vec<u8>, std::io::Error> {
+    let mut buffer = vec![0; entry.length as usize];
+    file.seek(SeekFrom::Start(entry.offset))?;
+    file.read_exact(&mut buffer)?;
+    Ok(buffer)
+}
+
 /// Read a depth and color image given by an association.
-fn read_images_buf(
+fn read_images<R: Read + Seek>(
     assoc: &tum_rgbd::Association,
-    archive: &HashMap<String, Vec<u8>>,
+    file: &mut R,
+    entries: &HashMap<String, FileEntry>,
 ) -> Result<(DMatrix<u16>, DMatrix<u8>), image::ImageError> {
     // Read depth image.
     let depth_path_str = assoc.depth_file_path.to_str().expect("oaea").to_owned();
-    let depth_buffer = archive.get(&depth_path_str).expect("Should be here");
+    let depth_buffer = get_buffer(&depth_path_str, file, entries)?;
     let (w, h, depth_map_vec_u16) = read_png_16bits_buf(depth_buffer.as_slice())?;
     let depth_map = DMatrix::from_row_slice(h, w, depth_map_vec_u16.as_slice());
 
     // Read color image.
     let img_path_str = assoc.color_file_path.to_str().expect("oaeaauuu").to_owned();
-    let img_buffer = archive.get(&img_path_str).expect("Should be here");
+    let img_buffer = get_buffer(&img_path_str, file, entries)?;
     // let img_decoder = image::png::PNGDecoder::new(img_buffer.as_slice())?;
     let img = image::load(Cursor::new(img_buffer), image::ImageFormat::PNG)?;
     let img_mat = interop::matrix_from_image(img.to_luma());
