@@ -34,22 +34,10 @@ fn my_run(args: &[String]) -> Result<(), Box<Error>> {
     // Check that the arguments are correct.
     let valid_args = check_args(args)?;
 
-    // TODO read the archive.
-    let archive_file = File::open(&valid_args.archive_path)?;
-    let mut archive = tar::Archive::new(archive_file);
-
-    // TODO create a hashmap with the content
-    let mut data = HashMap::new();
-    for file in archive.entries()? {
-        // Check for an I/O error.
-        let mut file = file?;
-
-        // Insert the file into the hashmap with its name as key.
-        let file_path = file.header().path()?.to_str().expect("oops").to_owned();
-        let mut buffer = Vec::with_capacity(file.header().size()? as usize);
-        file.read_to_end(&mut buffer)?;
-        data.insert(file_path, buffer);
-    }
+    // Load data from the archive.
+    // let archive_file = File::open(&valid_args.archive_path)?;
+    // let data = load_data(archive_file)?;
+    let data = load_data_from(&valid_args.archive_path)?;
 
     // Build a vector containing timestamps and full paths of images.
     let associations_buffer = data.get("associations.txt").expect("sad");
@@ -132,6 +120,47 @@ fn create_camera(camera_id: &str) -> Result<Intrinsics, String> {
             Err(format!("Unknown camera id: {}", camera_id))
         }
     }
+}
+
+/// Load the archived data into a hashmap with file paths as keys.
+fn load_data_from(archive_path: &PathBuf) -> Result<HashMap<String, Vec<u8>>, std::io::Error> {
+    let archive_file = File::open(archive_path)?;
+    let mut archive = tar::Archive::new(archive_file);
+
+    // Create a hashmap with the content
+    let mut data = HashMap::new();
+    for file in archive.entries()? {
+        // Check for an I/O error.
+        let mut file = file?;
+
+        // Insert the file into the hashmap with its name as key.
+        let file_path = file.header().path()?.to_str().expect("oops").to_owned();
+        let mut buffer = Vec::with_capacity(file.header().size()? as usize);
+        file.read_to_end(&mut buffer)?;
+        data.insert(file_path, buffer);
+    }
+
+    Ok(data)
+}
+
+/// Load the archived data into a hashmap with file paths as keys.
+fn load_data<R: Read>(r: R) -> Result<HashMap<String, Vec<u8>>, std::io::Error> {
+    let mut archive = tar::Archive::new(r);
+
+    // Create a hashmap with the content
+    let mut data = HashMap::new();
+    for file in archive.entries()? {
+        // Check for an I/O error.
+        let mut file = file?;
+
+        // Insert the file into the hashmap with its name as key.
+        let file_path = file.header().path()?.to_str().expect("oops").to_owned();
+        let mut buffer = Vec::with_capacity(file.header().size()? as usize);
+        file.read_to_end(&mut buffer)?;
+        data.insert(file_path, buffer);
+    }
+
+    Ok(data)
 }
 
 /// Open an association file (in bytes form) and parse it into a vector of Association.
