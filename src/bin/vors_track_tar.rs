@@ -39,7 +39,7 @@ fn my_run(args: &[String]) -> Result<(), Box<Error>> {
     let mut archive = tar::Archive::new(archive_file);
 
     // TODO create a hashmap with the content
-    let mut archive_contents = HashMap::new();
+    let mut data = HashMap::new();
     for file in archive.entries()? {
         // Check for an I/O error.
         let mut file = file?;
@@ -48,11 +48,11 @@ fn my_run(args: &[String]) -> Result<(), Box<Error>> {
         let file_path = file.header().path()?.to_str().expect("oops").to_owned();
         let mut buffer = Vec::with_capacity(file.header().size()? as usize);
         file.read_to_end(&mut buffer)?;
-        archive_contents.insert(file_path, buffer);
+        data.insert(file_path, buffer);
     }
 
     // Build a vector containing timestamps and full paths of images.
-    let associations_buffer = archive_contents.get("associations.txt").expect("sad");
+    let associations_buffer = data.get("associations.txt").expect("sad");
     let associations = parse_associations_buf(associations_buffer)?;
 
     // Setup tracking configuration.
@@ -65,7 +65,7 @@ fn my_run(args: &[String]) -> Result<(), Box<Error>> {
     };
 
     // Initialize tracker with first depth and color image.
-    let (depth_map, img) = read_images_buf(&associations[0], &archive_contents)?;
+    let (depth_map, img) = read_images_buf(&associations[0], &data)?;
     let depth_time = associations[0].depth_timestamp;
     let img_time = associations[0].color_timestamp;
     let mut tracker = config.init(depth_time, &depth_map, img_time, img);
@@ -73,7 +73,7 @@ fn my_run(args: &[String]) -> Result<(), Box<Error>> {
     // Track every frame in the associations file.
     for assoc in associations.iter().skip(1) {
         // Load depth and color images.
-        let (depth_map, img) = read_images_buf(assoc, &archive_contents)?;
+        let (depth_map, img) = read_images_buf(assoc, &data)?;
 
         // Track the rgb-d image.
         tracker.track(
