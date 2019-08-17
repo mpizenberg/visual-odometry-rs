@@ -17,12 +17,15 @@ license = "MPL-2.0" # SPDX license
 image = "0.21" # Encoding/decoding images in Rust.
 png = "0.14"
 byteorder = "1.2" # Reading numbers in [big/little]-endian.
-nalgebra = "0.17" # Linear algebra.
+nalgebra = "0.18" # Linear algebra.
 rand = "0.6" # Random number generators.
 num-traits = "0.2" # Useful numeric traits.
 nom = "4.2" # Parsing files.
 itertools = "0.7" # More iterators.
 tar = "0.4.23" # Testing archives.
+
+# Attempt at visualization
+kiss3d = "0.21"
 
 
 [dev-dependencies]

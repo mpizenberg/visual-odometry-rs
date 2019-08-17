@@ -12,7 +12,7 @@ use itertools::izip;
 use nalgebra::DMatrix;
 
 use crate::core::{
-    camera::Intrinsics,
+    camera::{Camera, Intrinsics},
     candidates::coarse_to_fine as candidates,
     gradient,
     inverse_depth::{self, InverseDepth},
@@ -21,7 +21,7 @@ use crate::core::{
 };
 use crate::math::optimizer::State as _;
 use crate::misc::helper;
-use crate::misc::type_aliases::{Float, Iso3, Mat6, Point2, Vec6};
+use crate::misc::type_aliases::{Float, Iso3, Mat6, Point2, Point3, Vec6};
 
 /// Type alias to easily spot vectors that are indexed over multi-resolution levels.
 pub type Levels<T> = Vec<T>;
@@ -173,7 +173,7 @@ impl Tracker {
         depth_map: &DMatrix<u16>,
         img_time: f64,
         img: DMatrix<u8>,
-    ) {
+    ) -> bool {
         let mut lm_model = self.state.current_frame_pose.inverse() * self.state.keyframe_pose;
         let img_multires = multires::mean_pyramid(self.config.nb_levels, img);
         let keyframe_data = &self.state.keyframe_multires_data;
@@ -237,6 +237,8 @@ impl Tracker {
             self.state.keyframe_img_timestamp = img_time;
             self.state.keyframe_pose = self.state.current_frame_pose;
         }
+
+        change_keyframe
     } // track
 
     /// Retrieve the current frame timestamp (of depth image) and pose.
@@ -245,6 +247,19 @@ impl Tracker {
             self.state.current_frame_depth_timestamp,
             self.state.current_frame_pose,
         )
+    }
+
+    pub fn points_3d(&self) -> Vec<Point3> {
+        let intrinsics = &self.config.intrinsics;
+        let extrinsics = &self.state.keyframe_pose;
+        let camera = Camera::new(intrinsics.clone(), extrinsics.clone());
+        let coordinates = &self.state.keyframe_multires_data.usable_candidates_multires[0].0;
+        let _z = &self.state.keyframe_multires_data.usable_candidates_multires[0].1;
+        coordinates
+            .iter()
+            .zip(_z.iter())
+            .map(|((x, y), _z)| camera.back_project(Point2::new(*x as f32, *y as f32), 1.0 / _z))
+            .collect()
     }
 } // impl Tracker
 
