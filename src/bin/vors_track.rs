@@ -2,13 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-extern crate image;
-extern crate nalgebra as na;
-extern crate visual_odometry_rs as vors;
-
-use na::DMatrix;
+use image;
+use nalgebra::DMatrix;
 use std::{env, error::Error, fs, io::BufReader, io::Read, path::Path, path::PathBuf};
 
+use visual_odometry_rs as vors;
 use vors::core::camera::Intrinsics;
 use vors::core::track::inverse_compositional as track;
 use vors::dataset::tum_rgbd;
