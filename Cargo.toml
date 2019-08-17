@@ -22,7 +22,7 @@ rand = "0.6" # Random number generators.
 num-traits = "0.2" # Useful numeric traits.
 nom = "4.2" # Parsing files.
 itertools = "0.7" # More iterators.
-tar = "0.4" # Testing archives.
+tar = "0.4.23" # Testing archives.
 
 
 [dev-dependencies]
