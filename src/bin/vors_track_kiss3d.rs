@@ -191,44 +191,46 @@ impl State for AppState {
 
     fn step(&mut self, window: &mut Window) {
         // Track every frame in the associations file.
-        let assoc = &self.associations[self.next_frame];
-        self.next_frame += 1;
+        if self.next_frame < self.associations.len() {
+            let assoc = &self.associations[self.next_frame];
+            self.next_frame += 1;
 
-        // Load depth and color images.
-        let (depth_map, img) = read_images(assoc).expect("read_images error");
+            // Load depth and color images.
+            let (depth_map, img) = read_images(assoc).expect("read_images error");
 
-        // Track the rgb-d image.
-        let change_keyframe = self.tracker.track(
-            assoc.depth_timestamp,
-            &depth_map,
-            assoc.color_timestamp,
-            img,
-        );
+            // Track the rgb-d image.
+            let change_keyframe = self.tracker.track(
+                assoc.depth_timestamp,
+                &depth_map,
+                assoc.color_timestamp,
+                img,
+            );
 
-        // Print to stdout the frame pose.
-        let (timestamp, pose) = self.tracker.current_frame();
-        println!("{}", (tum_rgbd::Frame { timestamp, pose }).to_string());
+            // Print to stdout the frame pose.
+            let (timestamp, pose) = self.tracker.current_frame();
+            println!("{}", (tum_rgbd::Frame { timestamp, pose }).to_string());
 
-        // Render 3d points.
-        if change_keyframe {
-            let color = rand::random();
-            for point in self.tracker.points_3d().iter() {
-                self.point_cloud_renderer.push(*point, color);
+            // Render 3d points.
+            if change_keyframe {
+                let color = rand::random();
+                for point in self.tracker.points_3d().iter() {
+                    self.point_cloud_renderer.push(*point, color);
+                }
             }
+
+            let num_points_text = format!(
+                "Number of points: {}",
+                self.point_cloud_renderer.num_points()
+            );
+
+            window.draw_text(
+                &num_points_text,
+                &Point2::new(0.0, 20.0),
+                60.0,
+                &Font::default(),
+                &Point3::new(1.0, 1.0, 1.0),
+            );
         }
-
-        let num_points_text = format!(
-            "Number of points: {}",
-            self.point_cloud_renderer.num_points()
-        );
-
-        window.draw_text(
-            &num_points_text,
-            &Point2::new(0.0, 20.0),
-            60.0,
-            &Font::default(),
-            &Point3::new(1.0, 1.0, 1.0),
-        );
     }
 }
 
