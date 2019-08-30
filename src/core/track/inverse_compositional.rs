@@ -261,6 +261,11 @@ impl Tracker {
             .map(|(&(x, y), &_z)| camera.back_project(Point2::new(x as f32, y as f32), 1.0 / _z))
             .collect()
     }
+
+    /// Retrieve current keyframe.
+    pub fn keyframe_img(&self) -> DMatrix<u8> {
+        self.state.keyframe_multires_data.img_multires[1].clone()
+    }
 } // impl Tracker
 
 // Helper ######################################################################
