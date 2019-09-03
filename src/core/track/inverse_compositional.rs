@@ -34,6 +34,7 @@ pub struct Tracker {
 }
 
 /// Configuration of the Tracker.
+#[derive(Clone)]
 pub struct Config {
     /// Number of levels in the multi-resolution pyramids of images.
     pub nb_levels: usize,
@@ -265,6 +266,17 @@ impl Tracker {
     /// Retrieve current keyframe.
     pub fn keyframe_img(&self) -> DMatrix<u8> {
         self.state.keyframe_multires_data.img_multires[1].clone()
+    }
+
+    /// Retrieve camera intrinsics.
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
+
+    /// Reset camera pose.
+    pub fn reset_pose(&mut self, pose: Iso3) {
+        self.state.current_frame_pose = pose;
+        self.state.keyframe_pose = pose;
     }
 } // impl Tracker
 
