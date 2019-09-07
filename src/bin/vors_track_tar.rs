@@ -76,6 +76,7 @@ fn my_run(args: &[String]) -> Result<(), Box<Error>> {
 
         // Track the rgb-d image.
         tracker.track(
+            false,
             assoc.depth_timestamp,
             &depth_map,
             assoc.color_timestamp,

@@ -170,6 +170,7 @@ impl Tracker {
     #[allow(clippy::cast_precision_loss)]
     pub fn track(
         &mut self,
+        force_keyframe: bool,
         depth_time: f64,
         depth_map: &DMatrix<u16>,
         img_time: f64,
@@ -222,7 +223,7 @@ impl Tracker {
         let optical_flow = optical_flow_sum / _z_candidates.len() as Float;
         eprintln!("Optical_flow: {}", optical_flow);
 
-        let change_keyframe = optical_flow >= 1.0;
+        let change_keyframe = force_keyframe || optical_flow >= 1.0;
 
         // In case of keyframe change, update all keyframe info with current frame.
         if change_keyframe {
