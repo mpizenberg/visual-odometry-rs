@@ -263,9 +263,14 @@ impl Tracker {
             .collect()
     }
 
-    /// Retrieve current keyframe.
-    pub fn keyframe_img(&self) -> DMatrix<u8> {
-        self.state.keyframe_multires_data.img_multires[1].clone()
+    /// Retrieve current candidate coordinates at half resolution.
+    pub fn keyframe_candidates(&self) -> &[(usize, usize)] {
+        &self.state.keyframe_multires_data.usable_candidates_multires[1].0[..]
+    }
+
+    /// Retrieve current keyframe at half resolution.
+    pub fn keyframe_img(&self) -> &DMatrix<u8> {
+        &self.state.keyframe_multires_data.img_multires[1]
     }
 
     /// Retrieve camera intrinsics.
