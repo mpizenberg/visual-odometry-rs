@@ -269,12 +269,22 @@ impl Tracker {
         &self.state.keyframe_multires_data.usable_candidates_multires[1].0[..]
     }
 
+    /// Retrieve current candidate inverse depths at half resolution.
+    pub fn keyframe_candidates_idepths(&self) -> &[Float] {
+        &self.state.keyframe_multires_data.usable_candidates_multires[1].1[..]
+    }
+
     /// Retrieve current keyframe at half resolution.
     pub fn keyframe_img(&self) -> &DMatrix<u8> {
         &self.state.keyframe_multires_data.img_multires[1]
     }
 
     /// Retrieve camera intrinsics.
+    pub fn intrinsics(&self) -> &Levels<Intrinsics> {
+        &self.state.keyframe_multires_data.intrinsics_multires
+    }
+
+    /// Retrieve tracking config.
     pub fn config(&self) -> &Config {
         &self.config
     }
