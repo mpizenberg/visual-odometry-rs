@@ -13,6 +13,7 @@ use crate::math::se3;
 use crate::misc::type_aliases::{Float, Iso3, Mat6, Point2, Vec6};
 
 /// State of the Levenberg-Marquardt optimizer.
+#[derive(Debug, Clone)]
 pub struct LMOptimizerState {
     /// Levenberg-Marquardt hessian diagonal coefficient.
     pub lm_coef: Float,
@@ -28,6 +29,7 @@ pub struct LMOptimizerState {
 pub type EvalState = Result<EvalData, Float>;
 
 /// Data resulting of a successful model evaluation.
+#[derive(Debug, Clone)]
 pub struct EvalData {
     /// The hessian matrix of the system.
     pub hessian: Mat6,

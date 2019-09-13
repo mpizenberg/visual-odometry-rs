@@ -28,13 +28,14 @@ pub type Levels<T> = Vec<T>;
 
 /// Struct used for tracking the camera at each frame.
 /// Can only be constructed by initialization from a `Config`.
+#[derive(Debug, Clone)]
 pub struct Tracker {
     config: Config,
     state: State,
 }
 
 /// Configuration of the Tracker.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Config {
     /// Number of levels in the multi-resolution pyramids of images.
     pub nb_levels: usize,
@@ -50,6 +51,7 @@ pub struct Config {
 }
 
 /// Internal state of the tracker.
+#[derive(Debug, Clone)]
 struct State {
     keyframe_multires_data: MultiresData,
     keyframe_depth_timestamp: f64,
@@ -61,6 +63,7 @@ struct State {
 }
 
 /// Mostly multi-resolution data related to the frame.
+#[derive(Debug, Clone)]
 #[allow(clippy::type_complexity)]
 struct MultiresData {
     intrinsics_multires: Levels<Intrinsics>,
