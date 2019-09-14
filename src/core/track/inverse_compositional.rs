@@ -293,9 +293,39 @@ impl Tracker {
     }
 
     /// Reset camera pose.
-    pub fn reset_pose(&mut self, pose: Iso3) {
-        self.state.current_frame_pose = pose;
-        self.state.keyframe_pose = pose;
+    pub fn reset_pose(&mut self, kf_pose: Iso3, current_pose: Iso3) {
+        self.state.keyframe_pose = kf_pose;
+        self.state.current_frame_pose = current_pose;
+    }
+
+    /// Compute the reprojection error of a given camera pose for a given image.
+    /// Return (inside_ratio, mean_error).
+    #[allow(clippy::cast_precision_loss)]
+    #[allow(clippy::used_underscore_binding)]
+    pub fn reprojection_error(&self, pose: &Iso3, image_full_res: &DMatrix<u8>) -> (Float, Float) {
+        let mut count = 0;
+        let mut sum_error = 0.0;
+        let level = 4;
+        let (coords, idepths) =
+            &self.state.keyframe_multires_data.usable_candidates_multires[level];
+        let template = &self.state.keyframe_multires_data.img_multires[level];
+        let img_multires = multires::mean_pyramid(self.config.nb_levels, image_full_res.clone());
+        let image = &img_multires[level];
+        let intrinsics = &self.state.keyframe_multires_data.intrinsics_multires[level];
+        let projection = pose.inverse() * self.state.keyframe_pose;
+        for (&(x, y), &_z) in coords.iter().zip(idepths.iter()) {
+            // check if warp(x,y) is inside the image
+            let (u, v) = warp(&projection, x as Float, y as Float, _z, intrinsics);
+            if let Some(im) = interpolate(u, v, image) {
+                count += 1;
+                let tmp = template[(y, x)];
+                let residual = im - Float::from(tmp);
+                sum_error += residual.abs();
+            }
+        }
+        let inside_ratio = count as Float / idepths.len() as Float;
+        let mean_error = sum_error / count as Float;
+        (inside_ratio, mean_error)
     }
 } // impl Tracker
 
@@ -406,4 +436,37 @@ fn warp(model: &Iso3, x: Float, y: Float, _z: Float, intrinsics: &Intrinsics) ->
     let x2 = model * x1;
     let uvz2 = intrinsics.project(x2);
     (uvz2.x / uvz2.z, uvz2.y / uvz2.z)
+}
+
+/// Simple linear interpolation of a pixel with floating point coordinates.
+/// Return `None` if the point is outside of the image boundaries.
+/// TODO: duplicate of function in lm_optimizer.rs.
+#[allow(clippy::many_single_char_names)]
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_sign_loss)]
+#[allow(clippy::cast_precision_loss)]
+fn interpolate(x: Float, y: Float, image: &DMatrix<u8>) -> Option<Float> {
+    let (height, width) = image.shape();
+    let u = x.floor();
+    let v = y.floor();
+    if u >= 0.0 && u < (width - 2) as Float && v >= 0.0 && v < (height - 2) as Float {
+        let u_0 = u as usize;
+        let v_0 = v as usize;
+        let u_1 = u_0 + 1;
+        let v_1 = v_0 + 1;
+        let vu_00 = Float::from(image[(v_0, u_0)]);
+        let vu_10 = Float::from(image[(v_1, u_0)]);
+        let vu_01 = Float::from(image[(v_0, u_1)]);
+        let vu_11 = Float::from(image[(v_1, u_1)]);
+        let a = x - u;
+        let b = y - v;
+        Some(
+            (1.0 - b) * (1.0 - a) * vu_00
+                + b * (1.0 - a) * vu_10
+                + (1.0 - b) * a * vu_01
+                + b * a * vu_11,
+        )
+    } else {
+        None
+    }
 }
