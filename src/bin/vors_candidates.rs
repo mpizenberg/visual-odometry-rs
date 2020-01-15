@@ -23,7 +23,7 @@ fn main() {
 
 const USAGE: &str = "Usage: ./vors_candidates associations_file out_dir";
 
-fn my_run(args: &[String]) -> Result<(), Box<Error>> {
+fn my_run(args: &[String]) -> Result<(), Box<dyn Error>> {
     // Check that the arguments are correct.
     let (associations_file, out_dir) = check_args(args)?;
 
@@ -94,7 +94,7 @@ fn check_args(args: &[String]) -> Result<(PathBuf, PathBuf), String> {
     }
 }
 
-fn read_image<P: AsRef<Path>>(image_path: P) -> Result<Img, Box<Error>> {
+fn read_image<P: AsRef<Path>>(image_path: P) -> Result<Img, Box<dyn Error>> {
     Ok(interop::matrix_from_image(
         image::open(image_path)?.to_luma(),
     ))
@@ -137,7 +137,7 @@ fn save_candidates<P: AsRef<Path>>(
 }
 
 /// Open an association file and parse it into a vector of Association.
-fn parse_associations(file_path: PathBuf) -> Result<Vec<tum_rgbd::Association>, Box<Error>> {
+fn parse_associations(file_path: PathBuf) -> Result<Vec<tum_rgbd::Association>, Box<dyn Error>> {
     let file = fs::File::open(&file_path)?;
     let mut file_reader = BufReader::new(file);
     let mut content = String::new();

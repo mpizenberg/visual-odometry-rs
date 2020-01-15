@@ -23,7 +23,7 @@ fn main() {
 
 const USAGE: &str = "Usage: ./vors_track [fr1|fr2|fr3|icl] associations_file";
 
-fn my_run(args: &[String]) -> Result<(), Box<Error>> {
+fn my_run(args: &[String]) -> Result<(), Box<dyn Error>> {
     // Check that the arguments are correct.
     let valid_args = check_args(args)?;
 
@@ -112,7 +112,7 @@ fn create_camera(camera_id: &str) -> Result<Intrinsics, String> {
 /// Open an association file and parse it into a vector of Association.
 fn parse_associations<P: AsRef<Path>>(
     file_path: P,
-) -> Result<Vec<tum_rgbd::Association>, Box<Error>> {
+) -> Result<Vec<tum_rgbd::Association>, Box<dyn Error>> {
     let file = fs::File::open(&file_path)?;
     let mut file_reader = BufReader::new(file);
     let mut content = String::new();
@@ -137,7 +137,9 @@ fn abs_path<P: AsRef<Path>>(file_path: P, assoc: &tum_rgbd::Association) -> tum_
 }
 
 /// Read a depth and color image given by an association.
-fn read_images(assoc: &tum_rgbd::Association) -> Result<(DMatrix<u16>, DMatrix<u8>), Box<Error>> {
+fn read_images(
+    assoc: &tum_rgbd::Association,
+) -> Result<(DMatrix<u16>, DMatrix<u8>), Box<dyn Error>> {
     let (w, h, depth_map_vec_u16) = helper::read_png_16bits(&assoc.depth_file_path)?;
     let depth_map = DMatrix::from_row_slice(h, w, depth_map_vec_u16.as_slice());
     let img = interop::matrix_from_image(image::open(&assoc.color_file_path)?.to_luma());

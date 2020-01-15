@@ -30,7 +30,7 @@ fn main() {
 
 const USAGE: &str = "Usage: ./vors_track_tar [fr1|fr2|fr3|icl] archive.tar";
 
-fn my_run(args: &[String]) -> Result<(), Box<Error>> {
+fn my_run(args: &[String]) -> Result<(), Box<dyn Error>> {
     // Check that the arguments are correct.
     let valid_args = check_args(args)?;
 
@@ -135,7 +135,7 @@ fn create_camera(camera_id: &str) -> Result<Intrinsics, String> {
 }
 
 /// Open an association file (in bytes form) and parse it into a vector of Association.
-fn parse_associations_buf(buffer: &[u8]) -> Result<Vec<tum_rgbd::Association>, Box<Error>> {
+fn parse_associations_buf(buffer: &[u8]) -> Result<Vec<tum_rgbd::Association>, Box<dyn Error>> {
     let mut content = String::new();
     let mut slice = buffer;
     slice.read_to_string(&mut content)?;
