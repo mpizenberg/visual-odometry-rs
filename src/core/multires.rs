@@ -124,3 +124,21 @@ pub fn gradients_xy(multires_mat: &[DMatrix<u8>]) -> Vec<(DMatrix<i16>, DMatrix<
         })
         .collect()
 }
+
+/// Compute smooth centered gradients at each resolution from
+/// the image at the higher resolution.
+///
+/// As a consequence there is one less level in the gradients pyramid.
+pub fn gradients_xy_smooth(multires_mat: &[DMatrix<u8>]) -> Vec<(DMatrix<i16>, DMatrix<i16>)> {
+    // TODO: maybe it would be better to return Vec<DMatrix<(i16,i16)>>,
+    // to colocate the x and y gradient and do only one "halve" call?
+    let nb_levels = multires_mat.len();
+    let gradients_centered: Vec<(DMatrix<i16>, DMatrix<i16>)> =
+        multires_mat.iter().map(gradient::centered).collect();
+    let mean_halve = |mat| halve(mat, |a, b, c, d| (a + b + c + d) / 4).expect("Oops halve");
+    gradients_centered
+        .iter()
+        .take(nb_levels - 1)
+        .map(|(gx, gy)| (mean_halve(gx), mean_halve(gy)))
+        .collect()
+}

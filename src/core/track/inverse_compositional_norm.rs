@@ -113,7 +113,8 @@ fn precompute_multires_data(
     img_multires: Levels<DMatrix<u8>>,
 ) -> MultiresData {
     // Precompute multi-resolution of keyframe gradients.
-    let mut gradients_multires = multires::gradients_xy(&img_multires);
+    // let mut gradients_multires = multires::gradients_xy(&img_multires);
+    let mut gradients_multires = multires::gradients_xy_smooth(&img_multires);
     gradients_multires.insert(0, gradient::centered(&img_multires[0]));
     let gradients_squared_norm_multires: Vec<_> = gradients_multires
         .iter()
@@ -184,6 +185,7 @@ impl Tracker {
         let keyframe_data = &self.state.keyframe_multires_data;
         let mut optimization_went_well = true;
         for lvl in (0..self.config.nb_levels).rev() {
+            println!("--- Level {}", lvl);
             let obs = lm_optimizer::Obs {
                 intrinsics: &keyframe_data.intrinsics_multires[lvl],
                 template: &keyframe_data.img_multires[lvl],
