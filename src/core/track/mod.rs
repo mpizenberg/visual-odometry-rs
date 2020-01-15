@@ -6,9 +6,11 @@
 
 pub mod inverse_compositional;
 pub mod inverse_compositional_huber;
+pub mod inverse_compositional_norm;
 pub mod inverse_compositional_photo;
 pub mod inverse_compositional_robust;
 pub mod lm_optimizer;
 pub mod lm_optimizer_huber;
+pub mod lm_optimizer_norm;
 pub mod lm_optimizer_photo;
 pub mod lm_optimizer_robust;

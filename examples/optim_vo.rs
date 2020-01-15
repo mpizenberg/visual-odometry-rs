@@ -10,7 +10,7 @@ use na::DMatrix;
 use std::{env, error::Error, fs, io::BufReader, io::Read, path::Path, path::PathBuf};
 
 use vors::core::camera::Intrinsics;
-use vors::core::track::inverse_compositional as track;
+use vors::core::track::inverse_compositional_norm as track;
 use vors::dataset::tum_rgbd;
 use vors::misc::{helper, interop};
 
