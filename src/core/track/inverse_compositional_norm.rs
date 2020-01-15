@@ -149,7 +149,10 @@ fn precompute_multires_data(
         &usable_candidates_multires,
         &gradients_multires,
     )
-    .map(|(intrinsics, (coord, _z), (gx, gy))| warp_jacobians(intrinsics, coord, _z, gx, gy))
+    // .map(|(intrinsics, (coord, _z), (gx, gy))| warp_jacobians(intrinsics, coord, _z, gx, gy))
+    .map(|(intrinsics, (coord, _z), (gx, gy))| {
+        warp_jacobians_normalized(intrinsics, coord, _z, gx, gy)
+    })
     .collect();
 
     // Precompute the Hessians.
@@ -361,6 +364,30 @@ fn extract_z(idepth_mat: &DMatrix<InverseDepth>) -> (Vec<(usize, usize)>, Vec<Fl
     (coordinates, _z_vec)
 }
 
+/// Precompute jacobians for each candidate with normalized coordinates.
+#[allow(clippy::used_underscore_binding)]
+#[allow(clippy::cast_precision_loss)]
+fn warp_jacobians_normalized(
+    intrinsics: &Intrinsics,
+    coordinates: &[(usize, usize)],
+    _z_candidates: &[Float],
+    grad_x: &DMatrix<i16>,
+    grad_y: &DMatrix<i16>,
+) -> Vec<Vec6> {
+    let (fu, fv) = intrinsics.focal;
+    // Iterate on inverse depth candidates
+    coordinates
+        .iter()
+        .zip(_z_candidates.iter())
+        .map(|(&(u, v), &_z)| {
+            let gu = fu * Float::from(grad_x[(v, u)]);
+            let gv = fv * Float::from(grad_y[(v, u)]);
+            let normalized = intrinsics.back_project(Point2::new(u as f32, v as f32), 1.0 / _z);
+            warp_jacobian_normalized_at(gu, gv, normalized)
+        })
+        .collect()
+}
+
 /// Precompute jacobians for each candidate.
 #[allow(clippy::used_underscore_binding)]
 #[allow(clippy::cast_precision_loss)]
@@ -386,6 +413,32 @@ fn warp_jacobians(
             warp_jacobian_at(gu, gv, u as Float, v as Float, _z, cu, cv, fu, fv, s)
         })
         .collect()
+}
+
+/// Jacobian of the warping function for the inverse compositional algorithm
+/// with normalized coordinates.
+#[allow(clippy::too_many_arguments)]
+#[allow(clippy::many_single_char_names)]
+#[allow(clippy::used_underscore_binding)]
+#[allow(clippy::similar_names)]
+fn warp_jacobian_normalized_at(gu: Float, gv: Float, normalized: Point3) -> Vec6 {
+    // Intermediate computations
+    let x = normalized.x;
+    let y = normalized.y;
+    let _z = 1.0 / normalized.z;
+    let x_z = x * _z;
+    let y_z = y * _z;
+    let xy_zz = x_z * y_z;
+
+    // Jacobian of the warp
+    Vec6::new(
+        gu * _z,                                //
+        gv * _z,                                //  linear velocity terms
+        -_z * (x_z * gu + y_z * gv),            //  ___
+        -(gu * xy_zz + gv * (1.0 + y_z * y_z)), //
+        gu * (1.0 + x_z * x_z) + gv * xy_zz,    //  angular velocity terms
+        gv * x_z - gu * y_z,                    //
+    )
 }
 
 /// Jacobian of the warping function for the inverse compositional algorithm.
