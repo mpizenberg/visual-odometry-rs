@@ -79,8 +79,8 @@ impl LMOptimizerState {
                 // precompute residuals and energy
                 let tmp = obs.template[(y, x)];
                 let r = im - Float::from(tmp);
-                // energy_sum += r * r;
-                energy_sum += r.abs();
+                energy_sum += r * r;
+                // energy_sum += r.abs();
                 residuals.push(r);
                 inside_indices.push(idx); // keep only inside points
             }
@@ -171,16 +171,16 @@ impl<'a> optimizer::State<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState
             }
             // Can continue to iterate:
             (Err(_energy), false) => {
-                eprintln!("\t back from: {}", _energy);
+                // eprintln!("\t back from: {}", _energy);
                 let mut kept_state = self;
                 kept_state.lm_coef *= 10.0;
                 (kept_state, Continue::Forward)
             }
             (Ok(eval_data), false) => {
-                eprintln!("\t iter {}: energy = {}", nb_iter, eval_data.energy);
+                // eprintln!("\t iter {}: energy = {}", nb_iter, eval_data.energy);
                 let d_energy = self.eval_data.energy - eval_data.energy;
                 // 1.0 is totally empiric here
-                let continuation = if d_energy > 0.005 {
+                let continuation = if d_energy > 1.0 {
                     Continue::Forward
                 } else {
                     Continue::Stop

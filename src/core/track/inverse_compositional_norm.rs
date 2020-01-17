@@ -188,7 +188,7 @@ impl Tracker {
         let keyframe_data = &self.state.keyframe_multires_data;
         let mut optimization_went_well = true;
         for lvl in (0..self.config.nb_levels).rev() {
-            println!("--- Level {}", lvl);
+            // eprintln!("--- Level {}", lvl);
             let obs = lm_optimizer::Obs {
                 intrinsics: &keyframe_data.intrinsics_multires[lvl],
                 template: &keyframe_data.img_multires[lvl],
