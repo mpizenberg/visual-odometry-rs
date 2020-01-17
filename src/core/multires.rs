@@ -134,7 +134,7 @@ pub fn gradients_xy_smooth(multires_mat: &[DMatrix<u8>]) -> Vec<(DMatrix<i16>, D
     // to colocate the x and y gradient and do only one "halve" call?
     let nb_levels = multires_mat.len();
     let gradients_centered: Vec<(DMatrix<i16>, DMatrix<i16>)> =
-        multires_mat.iter().map(gradient::centered).collect();
+        multires_mat.iter().map(gradient::centered_double).collect();
     let mean_halve = |mat| halve(mat, |a, b, c, d| (a + b + c + d) / 4).expect("Oops halve");
     gradients_centered
         .iter()

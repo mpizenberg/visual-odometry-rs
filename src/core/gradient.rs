@@ -6,6 +6,32 @@
 
 use nalgebra as na;
 
+/// Compute a double of centered gradient to avoid division precision loss.
+///
+/// ( img(i+1,j) - img(i-1,j), img(i,j+1) - img(i,j-1) )
+///
+/// Gradients of pixels at the border of the image are set to 0.
+#[allow(clippy::similar_names)]
+pub fn centered_double(img: &na::DMatrix<u8>) -> (na::DMatrix<i16>, na::DMatrix<i16>) {
+    // TODO: might be better to return DMatrix<(i16,i16)>?
+    let (nb_rows, nb_cols) = img.shape();
+    let top = img.slice((0, 1), (nb_rows - 2, nb_cols - 2));
+    let bottom = img.slice((2, 1), (nb_rows - 2, nb_cols - 2));
+    let left = img.slice((1, 0), (nb_rows - 2, nb_cols - 2));
+    let right = img.slice((1, 2), (nb_rows - 2, nb_cols - 2));
+    let mut grad_x = na::DMatrix::zeros(nb_rows, nb_cols);
+    let mut grad_y = na::DMatrix::zeros(nb_rows, nb_cols);
+    let mut grad_x_inner = grad_x.slice_mut((1, 1), (nb_rows - 2, nb_cols - 2));
+    let mut grad_y_inner = grad_y.slice_mut((1, 1), (nb_rows - 2, nb_cols - 2));
+    for j in 0..nb_cols - 2 {
+        for i in 0..nb_rows - 2 {
+            grad_x_inner[(i, j)] = i16::from(right[(i, j)]) - i16::from(left[(i, j)]);
+            grad_y_inner[(i, j)] = i16::from(bottom[(i, j)]) - i16::from(top[(i, j)]);
+        }
+    }
+    (grad_x, grad_y)
+}
+
 /// Compute a centered gradient.
 ///
 /// 1/2 * ( img(i+1,j) - img(i-1,j), img(i,j+1) - img(i,j-1) )
