@@ -180,7 +180,7 @@ impl<'a> optimizer::State<Obs<'a>, EvalState, Iso3, String> for LMOptimizerState
                 // eprintln!("\t iter {}: energy = {}", nb_iter, eval_data.energy);
                 let d_energy = self.eval_data.energy - eval_data.energy;
                 // 1.0 is totally empiric here
-                let continuation = if d_energy > 1.0 {
+                let continuation = if d_energy > 0.1 {
                     Continue::Forward
                 } else {
                     Continue::Stop
